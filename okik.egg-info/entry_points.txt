@@ -1,0 +1,2 @@
+[console_scripts]
+okik = okik.main:typer_app

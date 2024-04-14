@@ -11,7 +11,7 @@ try:
     from version import __version__
 except ImportError:
     from .logger import log_error, log_running, log_start, log_success
-    from .version import __version__
+    from ..version import __version__
 from rich.console import Console
 
 
