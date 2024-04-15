@@ -6,13 +6,11 @@ from art import text2art
 import sys
 
 
-try:
-    from logger import log_error, log_running, log_start, log_success
-    from version import __version__
-except ImportError:
-    from .logger import log_error, log_running, log_start, log_success
-    from ..version import __version__
 from rich.console import Console
+
+
+from okik.logger import log_error, log_running, log_start, log_success
+from okik.version import __version__
 
 
 # Initialize Typer app

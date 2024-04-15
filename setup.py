@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages
-from version import __version__
+from okik.version import __version__
 
 # Read requirements.txt and store contents in a list
 with open("./requirements.txt") as f:
