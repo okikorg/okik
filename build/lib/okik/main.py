@@ -4,8 +4,7 @@ import shutil
 import typer
 from art import text2art
 import sys
-import asyncio
-from .endpoints import generate_service_yaml_file, create_route_handlers
+
 
 from rich.console import Console
 
@@ -121,7 +120,7 @@ def build(
 
 
 @typer_app.command()
-def serve(
+def serve_dev(
     entry_point: str = typer.Option(
         "main.py", "--entry-point", "-e", help="Entry point file"
     ),
@@ -147,103 +146,6 @@ def serve(
     os.system(
         f"uvicorn {os.path.splitext(entry_point)[0]}:app --host 0.0.0.0 --port 3000 --reload"
     )
-
-
-@typer_app.command()
-def launch(
-    cluster_name: str = typer.Option(
-        ..., "--cluster", "-c", help="Name of the cluster"
-    ),
-    config_file: str = typer.Option(
-        ..., "--config", "-f", help="Configuration file (.yaml)"
-    ),
-):
-    """
-    Deploy the application to the cloud.
-    """
-    asyncio.run(run_launch(cluster_name, config_file))
-
-
-async def run_launch(cluster_name, config_file):
-    console.print(
-        "Preparing to deploy the application to the cloud...", style="bold blue"
-    )
-
-    # Build the command
-    command = f"sky launch -c {cluster_name} {config_file}"
-    console.print(f"Running command: {command}", style="bold blue")
-
-    try:
-        # Execute the sky launch command with the provided cluster name and configuration file
-        process = await asyncio.create_subprocess_shell(
-            command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(), timeout=10
-            )  # Timeout after 180 seconds
-        except asyncio.TimeoutError:
-            console.print("Deployment process timed out.", style="bold red")
-            process.kill()
-            stdout, stderr = await process.communicate()
-
-        if process.returncode == 0:
-            console.print("Application deployed successfully!", style="bold green")
-            console.print(stdout.decode("utf-8"))
-        else:
-            console.print("Deployment failed.", style="bold red")
-            console.print(stderr.decode("utf-8"))
-
-    except Exception as e:
-        console.print(
-            f"An error occurred during deployment: {str(e)}", style="bold red"
-        )
-
-
-@typer_app.command()
-def create(
-    file_path: str = typer.Option(
-        "main.py", "--file", "-f", help="Path to the Python file"
-    )
-):
-    """
-    Create service YAML files to deploy the application to the cloud.
-    """
-    console = Console()
-    console.print("Creating the configuration files...", style="bold green")
-
-    try:
-        # Load the user-provided file
-        with open(file_path, "r") as file:
-            code = file.read()
-
-        # Execute the user-provided code
-        exec(code, globals())
-
-        # Find all classes decorated with @service
-        service_classes = [
-            obj
-            for obj in globals().values()
-            if isinstance(obj, type) and hasattr(obj, "_service_params")
-        ]
-
-        # Create the .okik/services/ directory if it doesn't exist
-        os.makedirs(".okik/services", exist_ok=True)
-
-        processed_classes = set()
-
-        for cls in service_classes:
-            if cls not in processed_classes:
-                generate_service_yaml_file(cls)
-                create_route_handlers(cls)
-                processed_classes.add(cls)
-
-        console.print("Configs created successfully!", style="bold green")
-    except FileNotFoundError:
-        console.print(f"File '{file_path}' not found.", style="bold red")
-    except Exception as e:
-        console.print(f"An error occurred: {str(e)}", style="bold red")
 
 
 @typer_app.command()

@@ -1,9 +1,7 @@
 from enum import Enum
-from dataclasses import dataclass
 
 
-@dataclass
-class Accelerators:
+class Accelerators(Enum):
     MI300X = "MI300X"
     MI250X = "MI250X"
     HGX_A100_80GB_SXM5 = "HGX A100 80GB SXM5"
@@ -20,3 +18,10 @@ class Accelerators:
     RTX_A6000 = "RTX A6000"
     RTX_A5500 = "RTX A5500"
     RTX_A4000 = "RTX A4000"
+
+    def __str__(self) -> str:
+        return self.value
+
+    @classmethod
+    def get_accelerators(cls):
+        return [acc.value for acc in cls]
