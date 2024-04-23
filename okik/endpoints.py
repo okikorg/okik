@@ -18,6 +18,7 @@ def generate_service_yaml(service_name: str, service_params: dict):
     # Implement the logic to generate the YAML content based on the service parameters
     # Return the generated YAML content as a string
     yaml_content = f"""
+  name: {service_name}
   workdir: .
   resources:
     cloud: runpod

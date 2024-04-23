@@ -8,7 +8,7 @@ To install Okik, follow these steps:
 
 1. Clone the repository: `git clone https://github.com/akashsokik/okik.git`
 2. Navigate to the project directory: `cd okik`
-3. Install Okik using pip: `pip install okik`
+3. Install Okik using pip: `pip install -e .`
 
 ## Usage
 

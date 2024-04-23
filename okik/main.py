@@ -3,14 +3,15 @@ import pyfiglet
 import shutil
 import typer
 from art import text2art
+import subprocess
 import sys
 import asyncio
-from .endpoints import generate_service_yaml_file, create_route_handlers
+from .endpoints import generate_service_yaml_file
 
 from rich.console import Console
 from rich.table import Table
 
-from okik.logger import log_error, log_running, log_start, log_success
+from okik.logger import log_error, log_running, log_start, log_success, log_info
 from okik.version import __version__
 
 
@@ -44,7 +45,7 @@ def init():
     Initialize the project with the required files and directories.
     Also login to the Okik cloud.
     """
-    console.print("Initializing the project..", style="bold green")
+    log_start("Initializing the project..")
 
 
 @typer_app.command()
@@ -52,7 +53,7 @@ def check():
     """
     Check if the project is ready to be deployed.
     """
-    console.print("Checking the project and deployments..", style="bold green")
+    log_start("Checking the project and deployments..")
 
 
 @typer_app.command()
@@ -121,10 +122,17 @@ def build(
 
 
 @typer_app.command()
-def serve(
+def server(
     entry_point: str = typer.Option(
         "main.py", "--entry-point", "-e", help="Entry point file"
     ),
+    reload: bool = typer.Option(
+        False, "--reload", "-r", help="Enable auto-reload for the server"
+    ),
+    host: str = typer.Option(
+        "0.0.0.0", "--host", "-h", help="Host address for the server"
+    ),
+    port: int = typer.Option(3000, "--port", "-p", help="Port for the server"),
 ):
     """
     Serve the python function, classes, or .py file on a local server or cloud-based environment.
@@ -143,19 +151,41 @@ def serve(
             log_error("Importing 'app' in the entry point file is not allowed.")
             return
 
-    # Run the server with the specified entry point file
-    os.system(
-        f"uvicorn {os.path.splitext(entry_point)[0]}:app --host 0.0.0.0 --port 3000 --reload"
-    )
+    # Prepare the uvicorn command
+    module_name = os.path.splitext(entry_point)[0]
+    reload_command = "--reload" if reload else ""
+    command = f"uvicorn {module_name}:app --host {host} --port {port} {reload_command}"
+
+    # Execute the command while suppressing the direct output
+    try:
+        process = subprocess.Popen(
+            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        log_start("Server running. Press CTRL+C to stop.")
+        log_info(f"Host: {host}, Port: {port}")
+        log_info(f"Auto-reload: {'Enabled' if reload else 'Disabled'}")
+        log_info(
+            f'Open "http://{host}:{port}/docs" in your browser to view the API documentation and run test requests.'
+        )
+        # listening to
+        log_info(f"Listening to http://{host}:{port}")
+        stdout, stderr = process.communicate()
+    except Exception as e:
+        log_error(f"Failed to start the server: {str(e)}")
+        return
+
+    if process.returncode != 0:
+        log_error("Server stopped with errors.")
+        log_error(stderr.decode())
+
+    log_info("Server stopped.")
 
 
 @typer_app.command()
-def launch(
-    cluster_name: str = typer.Option(
-        ..., "--cluster", "-c", help="Name of the cluster"
-    ),
+def serve(
+    cluster_name: str = typer.Option(..., "--name", "-n", help="Name of the service"),
     config_file: str = typer.Option(
-        ..., "--config", "-f", help="Configuration file (.yaml)"
+        ..., "--config", "-c", help="Configuration file (.yaml)"
     ),
 ):
     """
@@ -165,40 +195,41 @@ def launch(
 
 
 async def run_launch(cluster_name, config_file):
-    console.print(
-        "Preparing to deploy the application to the cloud...", style="bold blue"
-    )
+    log_info("Preparing to deploy the application to the cloud...")
 
-    # Build the command
-    command = f"sky launch -c {cluster_name} {config_file}"
-    console.print(f"Running command: {command}", style="bold blue")
+    # Ensure the config file path is correctly formatted
+    corrected_config_file = f"./{config_file}"
+    command = f"sky launch -c {cluster_name} {corrected_config_file}"
+    log_start(f"Running command: {command}")
 
     try:
-        # Execute the sky launch command with the provided cluster name and configuration file
         process = await asyncio.create_subprocess_shell(
             command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
 
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(), timeout=10
-            )  # Timeout after 180 seconds
-        except asyncio.TimeoutError:
-            console.print("Deployment process timed out.", style="bold red")
-            process.kill()
-            stdout, stderr = await process.communicate()
+        # Read output continuously to avoid buffer overflow
+        while True:
+            output = await process.stdout.readline()  # type: ignore
+            if output == b"":
+                break
+            console.print(output.decode().strip())
 
+        # Check for errors
+        stderr_output = await process.stderr.read()  # type: ignore
+        if stderr_output:
+            log_error(stderr_output.decode())
+
+        await process.wait()
         if process.returncode == 0:
-            console.print("Application deployed successfully!", style="bold green")
-            console.print(stdout.decode("utf-8"))
+            log_start("Application deployed successfully!")
         else:
-            console.print("Deployment failed.", style="bold red")
-            console.print(stderr.decode("utf-8"))
+            console.print(
+                "Deployment failed with exit code: {}".format(process.returncode),
+                style="bold red",
+            )
 
     except Exception as e:
-        console.print(
-            f"An error occurred during deployment: {str(e)}", style="bold red"
-        )
+        log_error(f"An error occurred during deployment: {str(e)}")
 
 
 @typer_app.command()
@@ -210,8 +241,7 @@ def create(
     """
     Create service YAML files to deploy the application to the cloud.
     """
-    console = Console()
-    console.print("Creating the configuration files...", style="bold green")
+    log_start("Creating the configuration files...")
 
     try:
         # Load the user-provided file
@@ -246,7 +276,7 @@ def create(
                 created_files.append((cls.__name__, yaml_file_path))
 
         # Create a table to display the created files and class names
-        table = Table(title="Created Files", show_header=True, header_style="bold")
+        table = Table(title="Created Files")
         table.add_column("Class Name", style="cyan")
         table.add_column("YAML File", style="magenta")
 
@@ -254,12 +284,12 @@ def create(
             table.add_row(class_name, yaml_file)
 
         console.print(table)
-        console.print("Configs created successfully!", style="bold green")
+        log_success("Configs created successfully!")
 
     except FileNotFoundError:
-        console.print(f"File '{file_path}' not found.", style="bold red")
+        log_error(f"File '{file_path}' not found.")
     except Exception as e:
-        console.print(f"An error occurred: {str(e)}", style="bold red")
+        log_error(f"An error occurred: {str(e)}")
 
 
 @typer_app.command()
@@ -271,21 +301,18 @@ def show_config(
     """
     Display all the YAML files stored in the specified directory.
     """
-    console = Console()
 
     if not os.path.exists(services_dir):
-        console.print(f"Directory '{services_dir}' not found.", style="bold red")
+        log_error(f"Directory '{services_dir}' not found.")
         return
 
     yaml_files = [file for file in os.listdir(services_dir) if file.endswith(".yaml")]
 
     if not yaml_files:
-        console.print(
-            "No YAML files found in the specified directory.", style="bold yellow"
-        )
+        log_info("No YAML files found in the specified directory.")
         return
 
-    table = Table(title="YAML Files", show_header=True, header_style="bold")
+    table = Table(title="YAML Files")
     table.add_column("File Name", style="cyan")
     table.add_column("File Path", style="magenta")
 
