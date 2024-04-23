@@ -8,7 +8,7 @@ import asyncio
 from .endpoints import generate_service_yaml_file, create_route_handlers
 
 from rich.console import Console
-
+from rich.table import Table
 
 from okik.logger import log_error, log_running, log_start, log_success
 from okik.version import __version__
@@ -232,18 +232,68 @@ def create(
         os.makedirs(".okik/services", exist_ok=True)
 
         processed_classes = set()
+        created_files = []
 
         for cls in service_classes:
             if cls not in processed_classes:
-                generate_service_yaml_file(cls)
-                create_route_handlers(cls)
+                yaml_file = generate_service_yaml_file(cls)
                 processed_classes.add(cls)
 
+                # Get the YAML file path
+                yaml_file_name = f"{cls.__name__.lower()}.yaml"
+                yaml_file_path = os.path.join(".okik/services", yaml_file_name)
+
+                created_files.append((cls.__name__, yaml_file_path))
+
+        # Create a table to display the created files and class names
+        table = Table(title="Created Files", show_header=True, header_style="bold")
+        table.add_column("Class Name", style="cyan")
+        table.add_column("YAML File", style="magenta")
+
+        for class_name, yaml_file in created_files:
+            table.add_row(class_name, yaml_file)
+
+        console.print(table)
         console.print("Configs created successfully!", style="bold green")
+
     except FileNotFoundError:
         console.print(f"File '{file_path}' not found.", style="bold red")
     except Exception as e:
         console.print(f"An error occurred: {str(e)}", style="bold red")
+
+
+@typer_app.command()
+def show_config(
+    services_dir: str = typer.Option(
+        ".okik/services", "--dir", "-d", help="Directory containing the YAML files"
+    )
+):
+    """
+    Display all the YAML files stored in the specified directory.
+    """
+    console = Console()
+
+    if not os.path.exists(services_dir):
+        console.print(f"Directory '{services_dir}' not found.", style="bold red")
+        return
+
+    yaml_files = [file for file in os.listdir(services_dir) if file.endswith(".yaml")]
+
+    if not yaml_files:
+        console.print(
+            "No YAML files found in the specified directory.", style="bold yellow"
+        )
+        return
+
+    table = Table(title="YAML Files", show_header=True, header_style="bold")
+    table.add_column("File Name", style="cyan")
+    table.add_column("File Path", style="magenta")
+
+    for yaml_file in yaml_files:
+        file_path = os.path.join(services_dir, yaml_file)
+        table.add_row(yaml_file, file_path)
+
+    console.print(table)
 
 
 @typer_app.command()
