@@ -3,3 +3,5 @@
 [bold red]Error: Entry point file 'main.py' not found.[/bold red]
 [bold red]Error: Entry point file 'main.py' not found.[/bold red]
 [bold red]Error: Entry point file 'main.py' not found.[/bold red]
+[bold green]Starting: Serving the application with entry point: main.py[/bold green]
+[bold red]Error: Entry point file 'main.py' not found.[/bold red]

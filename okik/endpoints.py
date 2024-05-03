@@ -21,7 +21,6 @@ def generate_service_yaml(service_name: str, service_params: dict):
   name: {service_name}
   workdir: .
   resources:
-    cloud: runpod
     accelerators:
       {service_params["accelerator"]}: {service_params["accelerator_count"]}
   setup: |

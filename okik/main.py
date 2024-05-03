@@ -6,6 +6,7 @@ from art import text2art
 import subprocess
 import sys
 import asyncio
+import uuid
 from .endpoints import generate_service_yaml_file
 
 from rich.console import Console
@@ -62,10 +63,10 @@ def build(
         "main.py", "--entry-point", "-e", help="Entry point file"
     ),
     docker_file: str = typer.Option(
-        "Dockerfile", "--docker-file", "-d", help="Dockerfile name"
+        ..., "--docker-file", "-d", help="Dockerfile name", prompt="Please provide a Dockerfile"
     ),
     app_name: str = typer.Option(
-        "okik-app", "--app-name", "-a", help="Name of the Docker image"
+        None, "--app-name", "-a", help="Name of the Docker image"
     ),
 ):
     """
@@ -85,28 +86,22 @@ def build(
     log_running(f"Copying entry point file to temporary directory")
     shutil.copy(entry_point, os.path.join(temp_dir, os.path.basename(entry_point)))
 
-    # Generate the Dockerfile content
-    dockerfile_content = f"""
-    FROM python:3.9
+    # Check if the Dockerfile exists
+    if not os.path.isfile(docker_file):
+        log_error(f"Dockerfile '{docker_file}' not found.")
+        return
 
-    WORKDIR /app
-
-    COPY {os.path.basename(entry_point)} .
-    COPY requirements.txt .
-
-    RUN pip install --no-cache-dir -r requirements.txt
-
-    CMD ["uvicorn", "okik:app", "--host", "0.0.0.0", "--port", "80"]
-    """
-
-    # Write the Dockerfile to the temporary directory
-    log_running(f"Writing Dockerfile to temporary directory")
-    with open(os.path.join(temp_dir, docker_file), "w") as f:
-        f.write(dockerfile_content)
+    # Copy the Dockerfile to the temporary directory
+    log_running(f"Copying Dockerfile to temporary directory")
+    shutil.copy(docker_file, os.path.join(temp_dir, os.path.basename(docker_file)))
 
     # Copy the requirements.txt file to the temporary directory
     log_running(f"Copying requirements.txt file to temporary directory")
     shutil.copy("requirements.txt", os.path.join(temp_dir, "requirements.txt"))
+
+    # If app_name is not provided, generate a unique one
+    if not app_name:
+        app_name = f"app-{uuid.uuid4()}"
 
     # Build the Docker image
     log_start(f"Building the Docker image '{app_name}'")
@@ -180,26 +175,39 @@ def server(
 
     log_info("Server stopped.")
 
-
 @typer_app.command()
-def serve(
-    cluster_name: str = typer.Option(..., "--name", "-n", help="Name of the service"),
-    config_file: str = typer.Option(
-        ..., "--config", "-c", help="Configuration file (.yaml)"
-    ),
-):
+def deploy():
     """
     Deploy the application to the cloud.
     """
-    asyncio.run(run_launch(cluster_name, config_file))
+    services_dir = ".okik/services"
+    service_files = [f for f in os.listdir(services_dir) if f.endswith('.yaml')]
+    if not service_files:
+        console.print("No service files found in the directory.")
+        return
 
+    console.print("Please select a service to deploy:", style="bold")
+    table = Table(title="Services")
+    table.add_column("Index", style="cyan")
+    table.add_column("Name", style="magenta")
+    table.add_column("YAML File Location", style="green")
+    for i, service_file in enumerate(service_files, start=1):
+        table.add_row(str(i), service_file, os.path.join(services_dir, service_file))
+    console.print(table)
 
-async def run_launch(cluster_name, config_file):
-    log_info("Preparing to deploy the application to the cloud...")
+    service_number = input("Enter the number of the service: ")
+    if service_number.isdigit() and 1 <= int(service_number) <= len(service_files):
+        service_file = service_files[int(service_number) - 1]
+        config_file = os.path.join(services_dir, service_file)
+        asyncio.run(run_launch(config_file))
+    else:
+        console.print("Invalid service number.")
+        return
 
-    # Ensure the config file path is correctly formatted
-    corrected_config_file = f"./{config_file}"
-    command = f"sky launch -c {cluster_name} {corrected_config_file}"
+async def run_launch(config_file):
+    log_info(f"Preparing to deploy the service to the cloud...")
+
+    command = f"sky launch -c runpod_main {config_file}"
     log_start(f"Running command: {command}")
 
     try:
@@ -221,10 +229,10 @@ async def run_launch(cluster_name, config_file):
 
         await process.wait()
         if process.returncode == 0:
-            log_start("Application deployed successfully!")
+            log_start("Service deployed successfully!")
         else:
             console.print(
-                "Deployment failed with exit code: {}".format(process.returncode),
+                f"Deployment of service failed with exit code: {process.returncode}",
                 style="bold red",
             )
 
@@ -232,16 +240,18 @@ async def run_launch(cluster_name, config_file):
         log_error(f"An error occurred during deployment: {str(e)}")
 
 
+
+
 @typer_app.command()
-def create(
+def apply(
     file_path: str = typer.Option(
         "main.py", "--file", "-f", help="Path to the Python file"
     )
 ):
     """
-    Create service YAML files to deploy the application to the cloud.
+    Apply service YAML files to deploy the application to the cloud.
     """
-    log_start("Creating the configuration files...")
+    log_start("Applying the configuration files...")
 
     try:
         # Load the user-provided file
@@ -273,18 +283,27 @@ def create(
                 yaml_file_name = f"{cls.__name__.lower()}.yaml"
                 yaml_file_path = os.path.join(".okik/services", yaml_file_name)
 
-                created_files.append((cls.__name__, yaml_file_path))
+                # Get the status of the file
+                status = get_file_status(yaml_file_path)  # This function needs to be implemented
+                status_color = get_status_color(status)  # This function needs to be implemented
 
-        # Create a table to display the created files and class names
-        table = Table(title="Created Files")
+                created_files.append((cls.__name__, yaml_file_path, status, status_color))
+
+        if not created_files:
+            log_info("No configurations found to apply YAML files.")
+            return
+
+        # Create a table to display the created files, class names and status
+        table = Table(title="Applied Files")
         table.add_column("Class Name", style="cyan")
         table.add_column("YAML File", style="magenta")
+        table.add_column("Status", style="yellow")
 
-        for class_name, yaml_file in created_files:
-            table.add_row(class_name, yaml_file)
+        for class_name, yaml_file, status, status_color in created_files:
+            table.add_row(class_name, yaml_file, f"[{status_color}]{status}[/{status_color}]")
 
         console.print(table)
-        log_success("Configs created successfully!")
+        log_success("Configs applied successfully!")
 
     except FileNotFoundError:
         log_error(f"File '{file_path}' not found.")
@@ -315,12 +334,34 @@ def show_config(
     table = Table(title="YAML Files")
     table.add_column("File Name", style="cyan")
     table.add_column("File Path", style="magenta")
+    table.add_column("Status", style="yellow")
 
     for yaml_file in yaml_files:
         file_path = os.path.join(services_dir, yaml_file)
-        table.add_row(yaml_file, file_path)
+        status = get_file_status(file_path)  # This function needs to be implemented
+        status_color = get_status_color(status)  # This function needs to be implemented
+        table.add_row(yaml_file, file_path, f"[{status_color}]{status}[/{status_color}]")
 
     console.print(table)
+
+def get_file_status(file_path: str) -> str:
+    """
+    Check if the file exists and return a status string.
+    """
+    if os.path.exists(file_path):
+        return "Exists"
+    else:
+        return "Does not exist"
+
+def get_status_color(status: str) -> str:
+    """
+    Return a color string based on the status.
+    """
+    if status == "Exists":
+        return "green"
+    else:
+        return "red"
+    
 
 
 @typer_app.command()

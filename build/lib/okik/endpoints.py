@@ -5,51 +5,53 @@ import torch
 import torch.nn as nn
 import asyncio
 import numpy as np
-import yaml
 from .machines import Accelerators
+from rich.console import Console
 
+
+console = Console()
 app = FastAPI()
 router = APIRouter()
 
 
-def generate_service_yaml(
-    replicas: int, accelerator: Accelerators, accelerator_count: int = 1
-):
+def generate_service_yaml(service_name: str, service_params: dict):
+    # Implement the logic to generate the YAML content based on the service parameters
+    # Return the generated YAML content as a string
+    yaml_content = f"""
+  name: {service_name}
+  workdir: .
+  resources:
+    accelerators:
+      {service_params["accelerator"]}: {service_params["accelerator_count"]}
+  setup: |
+    echo "Setting up the service..."
+  run: |
+    echo "Running the service..."
+"""
+    return yaml_content
 
-    service_yaml = {
-        "resources": {
-            "cloud": "runpod",
-            "accelerators": (f"{accelerator}:{accelerator_count}"),
-        },
-        "workdir": ".",
-        "setup": "pip install -r requirements.txt",
-        "run": "python okik/main.py serve-dev -e main.py",
-    }
 
-    with open("service.yaml", "w") as file:
-        yaml.dump(service_yaml, file)
+def generate_service_yaml_file(cls):
+    service_name = cls.__name__.lower()
+    service_params = cls._service_params
+
+    yaml_content = generate_service_yaml(service_name, service_params)
+
+    file_path = f".okik/services/{service_name}.yaml"
+    with open(file_path, "w") as file:
+        file.write(yaml_content)
 
 
-def service(
-    model_class: Type,
-    replicas: int = 1,
-    accelerator=Accelerators.A40,
-    accelerator_count: int = 1,
-):
-    model_instance = model_class()
-    class_name = model_class.__name__
-
-    # Generate service.yaml
-    generate_service_yaml(replicas, accelerator)
+def create_route_handlers(cls):
+    model_instance = cls()
+    class_name = cls.__name__
 
     for method_name, method in inspect.getmembers(
         model_instance, predicate=inspect.ismethod
     ):
         if hasattr(method, "is_endpoint"):
-
             # Function factory to create a route handler for each method
             def create_endpoint_route(method):
-                # Move the determination of endpoint_schema inside this function
                 endpoint_schema = inspect.signature(method)
 
                 async def endpoint_route(request: Request):
@@ -78,6 +80,28 @@ def service(
             )(unique_endpoint_route)
 
     app.include_router(router)
+
+
+def service(
+    model_class: Type = None,  # type: ignore
+    replicas: int = 1,
+    accelerator=Accelerators.A40,
+    accelerator_count: int = 1,
+):
+    def decorator(cls):
+        cls._service_params = {
+            "replicas": replicas,
+            "accelerator": accelerator,
+            "accelerator_count": accelerator_count,
+        }
+        generate_service_yaml_file(cls)
+        create_route_handlers(cls)
+        return cls
+
+    if model_class is None:
+        return decorator
+    else:
+        return decorator(model_class)
 
 
 async def call_method(model_instance, method, kwargs: Dict[str, Any]):
