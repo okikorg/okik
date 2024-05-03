@@ -13,7 +13,6 @@ from rich.console import Console
 from rich.table import Table
 
 from okik.logger import log_error, log_running, log_start, log_success, log_info
-from version import __version__
 
 
 # Initialize Typer app
@@ -63,7 +62,11 @@ def build(
         "main.py", "--entry-point", "-e", help="Entry point file"
     ),
     docker_file: str = typer.Option(
-        ..., "--docker-file", "-d", help="Dockerfile name", prompt="Please provide a Dockerfile"
+        ...,
+        "--docker-file",
+        "-d",
+        help="Dockerfile name",
+        prompt="Please provide a Dockerfile",
     ),
     app_name: str = typer.Option(
         None, "--app-name", "-a", help="Name of the Docker image"
@@ -175,13 +178,14 @@ def server(
 
     log_info("Server stopped.")
 
+
 @typer_app.command()
 def deploy():
     """
     Deploy the application to the cloud.
     """
     services_dir = ".okik/services"
-    service_files = [f for f in os.listdir(services_dir) if f.endswith('.yaml')]
+    service_files = [f for f in os.listdir(services_dir) if f.endswith(".yaml")]
     if not service_files:
         console.print("No service files found in the directory.")
         return
@@ -203,6 +207,7 @@ def deploy():
     else:
         console.print("Invalid service number.")
         return
+
 
 async def run_launch(config_file):
     log_info(f"Preparing to deploy the service to the cloud...")
@@ -240,13 +245,9 @@ async def run_launch(config_file):
         log_error(f"An error occurred during deployment: {str(e)}")
 
 
-
-
 @typer_app.command()
 def apply(
-    file_path: str = typer.Option(
-        None, "--file", "-f", help="Path to the Python file"
-    )
+    file_path: str = typer.Option(None, "--file", "-f", help="Path to the Python file")
 ):
     """
     Apply service YAML files to deploy the application to the cloud.
@@ -289,10 +290,16 @@ def apply(
                 yaml_file_path = os.path.join(".okik/services", yaml_file_name)
 
                 # Get the status of the file
-                status = get_file_status(yaml_file_path)  # This function needs to be implemented
-                status_color = get_status_color(status)  # This function needs to be implemented
+                status = get_file_status(
+                    yaml_file_path
+                )  # This function needs to be implemented
+                status_color = get_status_color(
+                    status
+                )  # This function needs to be implemented
 
-                created_files.append((cls.__name__, yaml_file_path, status, status_color))
+                created_files.append(
+                    (cls.__name__, yaml_file_path, status, status_color)
+                )
 
         if not created_files:
             log_info("No configurations found to apply YAML files.")
@@ -305,7 +312,9 @@ def apply(
         table.add_column("Status", style="yellow")
 
         for class_name, yaml_file, status, status_color in created_files:
-            table.add_row(class_name, yaml_file, f"[{status_color}]{status}[/{status_color}]")
+            table.add_row(
+                class_name, yaml_file, f"[{status_color}]{status}[/{status_color}]"
+            )
 
         console.print(table)
         log_success("Configs applied successfully!")
@@ -345,9 +354,12 @@ def show_config(
         file_path = os.path.join(services_dir, yaml_file)
         status = get_file_status(file_path)  # This function needs to be implemented
         status_color = get_status_color(status)  # This function needs to be implemented
-        table.add_row(yaml_file, file_path, f"[{status_color}]{status}[/{status_color}]")
+        table.add_row(
+            yaml_file, file_path, f"[{status_color}]{status}[/{status_color}]"
+        )
 
     console.print(table)
+
 
 def get_file_status(file_path: str) -> str:
     """
@@ -358,6 +370,7 @@ def get_file_status(file_path: str) -> str:
     else:
         return "Does not exist"
 
+
 def get_status_color(status: str) -> str:
     """
     Return a color string based on the status.
@@ -366,15 +379,6 @@ def get_status_color(status: str) -> str:
         return "green"
     else:
         return "red"
-    
-
-
-@typer_app.command()
-def version():
-    """
-    Display the version of the package.
-    """
-    console.print(f"[bold green] version: [bold red]{__version__}")
 
 
 if __name__ == "__main__":
