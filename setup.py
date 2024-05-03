@@ -1,5 +1,5 @@
 from setuptools import setup, find_packages
-from okik.version import __version__
+from version import __version__
 
 # Read requirements.txt and store contents in a list
 with open("./requirements.txt") as f:
@@ -18,8 +18,8 @@ setup(
             "okik=okik.main:typer_app",
         ],
     },
-    install_requires=required,
+    install_requires=['fastapi', required],
     classifiers=[
-        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.11",
     ],
 )

@@ -5,7 +5,6 @@ okik/endpoints.py
 okik/logger.py
 okik/machines.py
 okik/main.py
-okik/version.py
 okik.egg-info/PKG-INFO
 okik.egg-info/SOURCES.txt
 okik.egg-info/dependency_links.txt

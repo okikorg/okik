@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from okik.logger import log_error, log_running, log_start, log_success, log_info
-from okik.version import __version__
+from version import __version__
 
 
 # Initialize Typer app
@@ -245,7 +245,7 @@ async def run_launch(config_file):
 @typer_app.command()
 def apply(
     file_path: str = typer.Option(
-        "main.py", "--file", "-f", help="Path to the Python file"
+        None, "--file", "-f", help="Path to the Python file"
     )
 ):
     """
@@ -253,8 +253,13 @@ def apply(
     """
     log_start("Applying the configuration files...")
 
+    if file_path is None:
+        file_path = os.path.join(os.getcwd(), "main.py")
+
     try:
         # Load the user-provided file
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"File '{file_path}' not found.")
         with open(file_path, "r") as file:
             code = file.read()
 
