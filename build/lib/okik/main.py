@@ -158,10 +158,10 @@ def server(
     reload_command = "--reload" if reload else ""
     command = f"uvicorn {module_name}:app --host {host} --port {port} {reload_command}"
 
-    # Execute the command and allow output to go directly to the console
+    # Execute the command while suppressing the direct output
     try:
         process = subprocess.Popen(
-            command, shell=True
+            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         log_start("Server running. Press CTRL+C to stop.")
         log_info(f"Host: {host}, Port: {port}")
@@ -178,7 +178,7 @@ def server(
 
     if process.returncode != 0:
         log_error("Server stopped with errors.")
-        log_error(stderr.decode() if stderr else "No error details available.")
+        log_error(stderr.decode())
 
     log_info("Server stopped.")
 

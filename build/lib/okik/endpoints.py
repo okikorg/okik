@@ -14,6 +14,23 @@ app = FastAPI()
 router = APIRouter()
 
 
+# def generate_service_yaml(service_name: str, service_params: dict):
+#     # Implement the logic to generate the YAML content based on the service parameters
+#     # Return the generated YAML content as a string
+#     yaml_content = f"""
+#   name: {service_name}
+#   workdir: .
+#   resources:
+#     accelerators:
+#       {service_params["accelerator"]}: {service_params["accelerator_count"]}
+#   setup: |
+#     echo "Setting up the service..."
+#   run: |
+#     echo "Running the service..."
+# """
+#     return yaml_content
+
+
 def generate_service_yaml(service_name: str, service_params: dict):
     # Implement the logic to generate the YAML content based on the service parameters
     # Return the generated YAML content as a string
@@ -25,7 +42,7 @@ spec:
   restartPolicy: OnFailure
   containers:
     - name: {service_name}
-      image: "some_image"
+      image: "k8s.gcr.io/cuda-vector-add:v0.1"
       resources:
         limits:
           nvidia.com/gpu: {service_params['accelerator_count']} # Limit the GPU count
