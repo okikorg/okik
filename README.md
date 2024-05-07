@@ -14,3 +14,7 @@ To install Okik, follow these steps:
 
 To run Okik, simply execute the following command in your terminal:
 `okik` or `okik --help`
+
+## Status
+
+Okik is currently in development so expect sharp edges and bugs. Feel free to contribute to the project by submitting a pull request.
