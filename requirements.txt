@@ -25,3 +25,4 @@ networkx
 torch
 typer
 typing_extensions
+numpy
