@@ -1,4 +1,4 @@
-# Okik
+# About
 
 **Okik** is a command-line interface (CLI) app that allows users to run various services such as LLM, RAG, or anything in between using various frameworks on any cloud. With **Okik**, you can easily run these services directly on any cloud without the hassle of managing your own infra.
 
