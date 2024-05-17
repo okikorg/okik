@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request
-from typing import Type, Callable, Any, Dict, Union, List
+from typing import Type, Callable, Any, Dict, Union, List, Optional
 import inspect
 import torch
 import torch.nn as nn
@@ -7,6 +7,7 @@ import asyncio
 import numpy as np
 from .machines import Accelerators
 from rich.console import Console
+from pydantic import BaseModel, ValidationError
 
 
 console = Console()
@@ -28,7 +29,7 @@ spec:
       image: "some_image"
       resources:
         limits:
-          nvidia.com/gpu: {service_params['accelerator_count']} # Limit the GPU count
+          nvidia.com/gpu: {service_params['accelerator']['count']} # Limit the GPU count
 """
     return yaml_content
 
@@ -43,11 +44,9 @@ def generate_service_yaml_file(cls):
     with open(file_path, "w") as file:
         file.write(yaml_content)
 
-
 def create_route_handlers(cls):
     model_instance = cls()
     class_name = cls.__name__
-
     for method_name, method in inspect.getmembers(
         model_instance, predicate=inspect.ismethod
     ):
@@ -85,26 +84,14 @@ def create_route_handlers(cls):
 
 
 def service(
-    model_class: Type = None,  # type: ignore
-    replicas: int = 1,
-    accelerator=Accelerators.A40,
-    accelerator_count: int = 1,
+    model_name: Optional[Type],
 ):
     def decorator(cls):
-        cls._service_params = {
-            "replicas": replicas,
-            "accelerator": accelerator,
-            "accelerator_count": accelerator_count,
-        }
-        generate_service_yaml_file(cls)
+        # cls._service_params = {}
+        # generate_service_yaml_file(cls)
         create_route_handlers(cls)
         return cls
-
-    if model_class is None:
-        return decorator
-    else:
-        return decorator(model_class)
-
+    return decorator(model_name)
 
 async def call_method(model_instance, method, kwargs: Dict[str, Any]):
     if asyncio.iscoroutinefunction(method):
@@ -123,10 +110,10 @@ def serialize_result(result: Any):
         return result.tolist()
     elif isinstance(result, dict):
         return {str(key): value for key, value in result.items()}
-    elif isinstance(result, (list, tuple, int, float, str, bool)):
+    elif isinstance(result, (list, tuple, int, float, str, bool, set)):
         return result
     else:
-        raise ValueError(f"Unsupported result type: {type(result)}")
+        raise HTTPException(status_code=500, detail="Unsupported return type {type(result)} for serialization")
 
 
 def api(func: Callable):

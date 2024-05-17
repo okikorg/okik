@@ -1,9 +1,6 @@
 from enum import Enum
-from dataclasses import dataclass
 
-
-@dataclass
-class Accelerators:
+class Accelerators(Enum):
     MI300X = "MI300X"
     MI250X = "MI250X"
     A100_80GB = "A100-80GB"

@@ -46,6 +46,10 @@ def init():
     Also login to the Okik cloud.
     """
     log_start("Initializing the project..")
+    services_dir = ".okik/services"
+    if not os.path.exists(services_dir):
+        os.makedirs(services_dir)
+    log_success("Services directory checked/created.")
 
 
 @typer_app.command()
@@ -158,10 +162,10 @@ def server(
     reload_command = "--reload" if reload else ""
     command = f"uvicorn {module_name}:app --host {host} --port {port} {reload_command}"
 
-    # Execute the command while suppressing the direct output
+    # Execute the command and allow output to go directly to the console
     try:
         process = subprocess.Popen(
-            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            command, shell=True
         )
         log_start("Server running. Press CTRL+C to stop.")
         log_info(f"Host: {host}, Port: {port}")
@@ -178,7 +182,7 @@ def server(
 
     if process.returncode != 0:
         log_error("Server stopped with errors.")
-        log_error(stderr.decode())
+        log_error(stderr.decode() if stderr else "No error details available.")
 
     log_info("Server stopped.")
 
@@ -289,6 +293,7 @@ async def run_launch(config_file):
 
     except Exception as e:
         log_error(f"An error occurred during deployment: {str(e)}")
+
 
 
 @typer_app.command()

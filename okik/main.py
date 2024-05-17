@@ -46,6 +46,10 @@ def init():
     Also login to the Okik cloud.
     """
     log_start("Initializing the project..")
+    services_dir = ".okik/services"
+    if not os.path.exists(services_dir):
+        os.makedirs(services_dir)
+    log_success("Services directory checked/created.")
 
 
 @typer_app.command()
@@ -291,84 +295,85 @@ async def run_launch(config_file):
         log_error(f"An error occurred during deployment: {str(e)}")
 
 
-@typer_app.command()
-def apply(
-    file_path: str = typer.Option(None, "--file", "-f", help="Path to the Python file")
-):
-    """
-    Apply service YAML files to deploy the application to the cloud.
-    """
-    log_start("Applying the configuration files...")
 
-    if file_path is None:
-        file_path = os.path.join(os.getcwd(), "main.py")
+# @typer_app.command()
+# def apply(
+#     file_path: str = typer.Option(None, "--file", "-f", help="Path to the Python file")
+# ):
+#     """
+#     Apply service YAML files to deploy the application to the cloud.
+#     """
+#     log_start("Applying the configuration files...")
 
-    try:
-        # Load the user-provided file
-        if not os.path.isfile(file_path):
-            raise FileNotFoundError(f"File '{file_path}' not found.")
-        with open(file_path, "r") as file:
-            code = file.read()
+#     if file_path is None:
+#         file_path = os.path.join(os.getcwd(), "main.py")
 
-        # Execute the user-provided code
-        exec(code, globals())
+#     try:
+#         # Load the user-provided file
+#         if not os.path.isfile(file_path):
+#             raise FileNotFoundError(f"File '{file_path}' not found.")
+#         with open(file_path, "r") as file:
+#             code = file.read()
 
-        # Find all classes decorated with @service
-        service_classes = [
-            obj
-            for obj in globals().values()
-            if isinstance(obj, type) and hasattr(obj, "_service_params")
-        ]
+#         # Execute the user-provided code
+#         exec(code, globals())
 
-        # Create the .okik/services/ directory if it doesn't exist
-        os.makedirs(".okik/services", exist_ok=True)
+#         # Find all classes decorated with @service
+#         service_classes = [
+#             obj
+#             for obj in globals().values()
+#             if isinstance(obj, type) and hasattr(obj, "_service_params")
+#         ]
 
-        processed_classes = set()
-        created_files = []
+#         # Create the .okik/services/ directory if it doesn't exist
+#         os.makedirs(".okik/services", exist_ok=True)
 
-        for cls in service_classes:
-            if cls not in processed_classes:
-                yaml_file = generate_service_yaml_file(cls)
-                processed_classes.add(cls)
+#         processed_classes = set()
+#         created_files = []
 
-                # Get the YAML file path
-                yaml_file_name = f"{cls.__name__.lower()}.yaml"
-                yaml_file_path = os.path.join(".okik/services", yaml_file_name)
+#         for cls in service_classes:
+#             if cls not in processed_classes:
+#                 yaml_file = generate_service_yaml_file(cls)
+#                 processed_classes.add(cls)
 
-                # Get the status of the file
-                status = get_file_status(
-                    yaml_file_path
-                )  # This function needs to be implemented
-                status_color = get_status_color(
-                    status
-                )  # This function needs to be implemented
+#                 # Get the YAML file path
+#                 yaml_file_name = f"{cls.__name__.lower()}.yaml"
+#                 yaml_file_path = os.path.join(".okik/services", yaml_file_name)
 
-                created_files.append(
-                    (cls.__name__, yaml_file_path, status, status_color)
-                )
+#                 # Get the status of the file
+#                 status = get_file_status(
+#                     yaml_file_path
+#                 )  # This function needs to be implemented
+#                 status_color = get_status_color(
+#                     status
+#                 )  # This function needs to be implemented
 
-        if not created_files:
-            log_info("No configurations found to apply YAML files.")
-            return
+#                 created_files.append(
+#                     (cls.__name__, yaml_file_path, status, status_color)
+#                 )
 
-        # Create a table to display the created files, class names and status
-        table = Table(title="Applied Files")
-        table.add_column("Class Name", style="cyan")
-        table.add_column("YAML File", style="magenta")
-        table.add_column("Status", style="yellow")
+#         if not created_files:
+#             log_info("No configurations found to apply YAML files.")
+#             return
 
-        for class_name, yaml_file, status, status_color in created_files:
-            table.add_row(
-                class_name, yaml_file, f"[{status_color}]{status}[/{status_color}]"
-            )
+#         # Create a table to display the created files, class names and status
+#         table = Table(title="Applied Files")
+#         table.add_column("Class Name", style="cyan")
+#         table.add_column("YAML File", style="magenta")
+#         table.add_column("Status", style="yellow")
 
-        console.print(table)
-        log_success("Configs applied successfully!")
+#         for class_name, yaml_file, status, status_color in created_files:
+#             table.add_row(
+#                 class_name, yaml_file, f"[{status_color}]{status}[/{status_color}]"
+#             )
 
-    except FileNotFoundError:
-        log_error(f"File '{file_path}' not found.")
-    except Exception as e:
-        log_error(f"An error occurred: {str(e)}")
+#         console.print(table)
+#         log_success("Configs applied successfully!")
+
+#     except FileNotFoundError:
+#         log_error(f"File '{file_path}' not found.")
+#     except Exception as e:
+#         log_error(f"An error occurred: {str(e)}")
 
 
 @typer_app.command()
