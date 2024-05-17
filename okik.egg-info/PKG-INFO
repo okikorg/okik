@@ -34,3 +34,4 @@ Requires-Dist: torch
 Requires-Dist: typer
 Requires-Dist: typing_extensions
 Requires-Dist: numpy
+Requires-Dist: httpie

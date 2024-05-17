@@ -27,3 +27,4 @@ torch
 typer
 typing_extensions
 numpy
+httpie

@@ -5,6 +5,7 @@ import typer
 from art import text2art
 import subprocess
 import sys
+import yaml
 import asyncio
 import uuid
 from .endpoints import generate_service_yaml_file
@@ -12,7 +13,7 @@ from .endpoints import generate_service_yaml_file
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-
+from rich.text import Text
 from okik.logger import log_error, log_running, log_start, log_success, log_info
 
 
@@ -60,72 +61,127 @@ def check():
     """
     log_start("Checking the project and deployments..")
 
-
 @typer_app.command()
 def build(
     entry_point: str = typer.Option(
-        "main.py", "--entry-point", "-e", help="Entry point file"
+        "main.py", "--entry_point", "-e", help="Entry point file"
     ),
     docker_file: str = typer.Option(
-        ...,
-        "--docker-file",
-        "-d",
-        help="Dockerfile name",
+        ..., "--docker-file", "-d", help="Dockerfile name",
     ),
     app_name: str = typer.Option(
         None, "--app-name", "-a", help="Name of the Docker image"
     ),
+    cloud_prefix: str = typer.Option(
+        None, "--cloud-prefix", "-c", help="Prefix for the cloud service"
+    ),
     registry_id: str = typer.Option(None, "--registry-id", "-r", help="Registry ID"),
     tag: str = typer.Option("latest", "--tag", "-t", help="Tag for the Docker image"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Print outputs from Docker"),
+    force_build: bool = typer.Option(False, "--force-build", "-f", help="Force rebuild of the Docker image"),
 ):
     """
     Take the python function, classes, or .py file, wrap it inside a container,
     and run it on the cloud based on user's configuration.
     """
-    # Check if the entry point file exists
-    if not os.path.isfile(entry_point):
-        log_error(f"Entry point file '{entry_point}' not found.")
-        return
+    steps = []
 
-    # Create a temporary directory
+    with console.status("[bold green]Checking entry point file...") as status:
+        if not os.path.isfile(entry_point):
+            log_error(f"Entry point file '{entry_point}' not found.")
+            return
+        steps.append("Checked entry point file.")
+
     temp_dir = ".okik_temp"
     os.makedirs(temp_dir, exist_ok=True)
 
-    # Copy the entry point file to the temporary directory
-    log_running(f"Copying entry point file to temporary directory")
-    shutil.copy(entry_point, os.path.join(temp_dir, os.path.basename(entry_point)))
+    with console.status("[bold green]Copying entry point file...") as status:
+        shutil.copy(entry_point, os.path.join(temp_dir, os.path.basename(entry_point)))
+        steps.append("Copied entry point file to temporary directory.")
 
-    # Check if the Dockerfile exists
-    if not os.path.isfile(docker_file):
-        log_error(f"Dockerfile '{docker_file}' not found.")
-        return
+    with console.status("[bold green]Checking Dockerfile...") as status:
+        if not os.path.isfile(docker_file):
+            log_error(f"Dockerfile '{docker_file}' not found.")
+            return
+        steps.append("Checked Dockerfile.")
 
-    # Copy the Dockerfile to the temporary directory
-    log_running(f"Copying Dockerfile to temporary directory")
-    shutil.copy(docker_file, os.path.join(temp_dir, os.path.basename(docker_file)))
+    with console.status("[bold green]Copying Dockerfile...") as status:
+        shutil.copy(docker_file, os.path.join(temp_dir, os.path.basename(docker_file)))
+        steps.append("Copied Dockerfile to temporary directory.")
 
-    # Copy the requirements.txt file to the temporary directory
-    log_running(f"Copying requirements.txt file to temporary directory")
-    shutil.copy("requirements.txt", os.path.join(temp_dir, "requirements.txt"))
+    with console.status("[bold green]Copying requirements.txt...") as status:
+        shutil.copy("requirements.txt", os.path.join(temp_dir, "requirements.txt"))
+        steps.append("Copied requirements.txt file to temporary directory.")
 
-    # If app_name is not provided, generate a unique one
-    if not app_name:
-        app_name = f"app-{uuid.uuid4()}"
+    images_dir = ".okik/images"
+    os.makedirs(images_dir, exist_ok=True)
+    image_yaml_path = os.path.join(images_dir, "images.yaml")
 
-    # Format the Docker image name
-    docker_image_name = f"cr.ai.nebius.cloud/{registry_id}/{app_name}:{tag}"
+    if force_build and os.path.exists(image_yaml_path):
+        os.remove(image_yaml_path)
+        console.print("Existing image name cleared due to force build.", style="bold red")
 
-    # Build the Docker image
-    log_start(f"Building the Docker image '{docker_image_name}'")
-    os.system(
-        f"docker build -t {docker_image_name} -f {os.path.join(temp_dir, docker_file)} {temp_dir}"
-    )
+    existing_app_name = None
+    if os.path.exists(image_yaml_path):
+        with open(image_yaml_path, "r") as yaml_file:
+            try:
+                yaml_content = yaml.safe_load(yaml_file)
+                existing_app_name = yaml_content.get("image_name")
+                if existing_app_name:
+                    console.print(f"Warning: Existing Docker image '{existing_app_name}' will be overwritten.", style="bold red")
+            except yaml.YAMLError as e:
+                log_error(f"Error reading YAML file: {e}")
 
-    # Clean up the temporary directory
-    log_running(f"Cleaning up temporary directory")
-    shutil.rmtree(temp_dir)
+    if existing_app_name:
+        docker_image_name = existing_app_name
+        steps.append(f"Using existing app name from YAML: {docker_image_name}")
+    else:
+        if not app_name:
+            app_name = f"app-{uuid.uuid4()}"
+            steps.append(f"Generated unique app name: {app_name}")
+        if cloud_prefix:
+            steps.append(f"Prefixed app name: {app_name}")
+            docker_image_name = f"{cloud_prefix}/{registry_id}/{app_name}:{tag}"
+        else:
+            docker_image_name = f"cr.ai.nebius.cloud/{registry_id}/{app_name}:{tag}"
+        steps.append(f"Formatted Docker image name: {docker_image_name}")
 
+        # Preserve image name in YAML file
+        with open(image_yaml_path, "w") as yaml_file:
+            yaml.dump({"image_name": docker_image_name}, yaml_file)
+        steps.append("Preserved image name in YAML file.")
+
+    build_command = f"docker build -t {docker_image_name} -f {os.path.join(temp_dir, docker_file)} {temp_dir}"
+    with console.status("[bold green]Building Docker image...") as status:
+        if verbose:
+            process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    console.print(output.strip())
+            stderr = process.stderr.read()
+            if stderr:
+                console.print(stderr, style="bold red")
+        else:
+            subprocess.run(build_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        steps.append(f"Built Docker image '{docker_image_name}'.")
+
+    with console.status("[bold green]Cleaning up temporary directory...") as status:
+        shutil.rmtree(temp_dir)
+        steps.append("Cleaned up temporary directory.")
+
+    steps.append(f"Docker image '{docker_image_name}' built successfully.")
     log_success(f"Docker image '{docker_image_name}' built successfully.")
+
+    # Prompt the user to build the image with more details with --verbose flag
+    steps.append("Build the image with more details using the --verbose flag if you want to see more details.")
+
+    # Display all steps inside a panel
+    steps_text = "\n".join(steps)
+    panel = Panel(Text(steps_text, justify="left"), title="Build Process Steps", border_style="green")
+    console.print(panel)
 
 @typer_app.command()
 def server(
