@@ -25,22 +25,22 @@ okik init
 Write this in your `main.py` file:
 
 ```python
-from okik.endpoints import service, api, app, AcceleratorConfigs, ServiceConfigs
+from okik.endpoints import service, api, app
 from sentence_transformers import SentenceTransformer
 import sentence_transformers
 from torch.nn.functional import cosine_similarity as cosine
 import torch
 
-
+# your service configuration
 @service(
     replicas=2,
     resources={"accelerator": {"type": "cuda", "device": "A40", "count": 2}}
 )
-class Embedder:
+class Embedder: # your service class which will be used to serve the requests
     def __init__(self):
         self.model = SentenceTransformer("paraphrase-MiniLM-L6-v2", cache_folder=".okik/cache")
 
-    @api
+    @api # your api endpoint
     def embed(self, sentence: str):
         logits = self.model.encode(sentence)
         return logits
@@ -54,7 +54,6 @@ class Embedder:
     @api
     def version(self):
         return sentence_transformers.__version__
-
 ```
 
 ## Verify the routes
