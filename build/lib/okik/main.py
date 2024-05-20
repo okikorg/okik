@@ -1,4 +1,5 @@
 import os
+import time
 import pyfiglet
 import shutil
 import typer
@@ -8,8 +9,8 @@ import sys
 import yaml
 import asyncio
 import uuid
-from .endpoints import generate_service_yaml_file
-
+import importlib
+from fastapi.routing import APIRoute
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -40,7 +41,6 @@ def main(ctx: typer.Context):
             "Type 'okik --help' for more commands.", style="dim"
         )  # Helper prompt
 
-
 @typer_app.command()
 def init():
     """
@@ -48,18 +48,11 @@ def init():
     Also login to the Okik cloud.
     """
     log_start("Initializing the project..")
-    services_dir = ".okik/services"
-    if not os.path.exists(services_dir):
-        os.makedirs(services_dir)
+    folders_list = [".okik/services", ".okik/images"]
+    for folder in folders_list:
+        os.makedirs(folder, exist_ok=True)
     log_success("Services directory checked/created.")
 
-
-@typer_app.command()
-def check():
-    """
-    Check if the project is ready to be deployed.
-    """
-    log_start("Checking the project and deployments..")
 
 @typer_app.command()
 def build(
@@ -84,7 +77,23 @@ def build(
     Take the python function, classes, or .py file, wrap it inside a container,
     and run it on the cloud based on user's configuration.
     """
+    start_time = time.time()
     steps = []
+
+    # Display arguments passed
+    arguments = {
+        "Entry Point": entry_point,
+        "Docker File": docker_file,
+        "App Name": app_name,
+        "Cloud Prefix": cloud_prefix,
+        "Registry ID": registry_id,
+        "Tag": tag,
+        "Verbose": verbose,
+        "Force Build": force_build
+    }
+    arguments_text = "\n".join([f"{key}: {value}" for key, value in arguments.items()])
+    panel = Panel(Text(arguments_text, justify="left"), title="Arguments Passed", border_style="blue")
+    console.print(panel)
 
     with console.status("[bold green]Checking entry point file...") as status:
         if not os.path.isfile(entry_point):
@@ -172,8 +181,10 @@ def build(
         shutil.rmtree(temp_dir)
         steps.append("Cleaned up temporary directory.")
 
-    steps.append(f"Docker image '{docker_image_name}' built successfully.")
-    log_success(f"Docker image '{docker_image_name}' built successfully.")
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    steps.append(f"Docker image '{docker_image_name}' built successfully in {elapsed_time:.2f} seconds.")
+    log_success(f"Docker image '{docker_image_name}' built successfully in {elapsed_time:.2f} seconds.")
 
     # Prompt the user to build the image with more details with --verbose flag
     steps.append("Build the image with more details using the --verbose flag if you want to see more details.")
@@ -182,6 +193,7 @@ def build(
     steps_text = "\n".join(steps)
     panel = Panel(Text(steps_text, justify="left"), title="Build Process Steps", border_style="green")
     console.print(panel)
+
 
 @typer_app.command()
 def server(
@@ -248,6 +260,46 @@ def server(
         log_error(stderr.decode() if stderr else "No error details available.")
 
     log_info("Server stopped.")
+
+
+@typer_app.command()
+def routes(
+    entry_point: str = typer.Option(
+        "main.py", "--entry-point", "-e", help="Entry point file"
+    ),
+):
+    """
+    Show all routes for the given FastAPI application instance.
+    """
+    if not os.path.isfile(entry_point):
+        console.print(f"Entry point file '{entry_point}' not found.", style="bold red")
+        return
+
+    module_name = os.path.splitext(entry_point)[0]
+
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, entry_point)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        app = getattr(module, "app", None)
+        if app is None:
+            console.print(f"No 'app' instance found in '{entry_point}'.", style="bold red")
+            return
+
+        routes_table = Table(title="Application Routes", show_header=True, header_style="bold")
+        routes_table.add_column("Path", justify="left", style="cyan", no_wrap=True)
+        routes_table.add_column("Name", style="magenta")
+        routes_table.add_column("Methods", justify="center", style="green")
+
+        for route in app.routes:
+            if isinstance(route, APIRoute):
+                methods = ", ".join(route.methods)
+                routes_table.add_row(route.path, route.name, methods)
+
+        console.print(routes_table)
+    except Exception as e:
+        console.print(f"Failed to load the entry point module '{entry_point}': {e}", style="bold red")
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:

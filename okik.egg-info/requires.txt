@@ -12,7 +12,7 @@ markdown-it-py
 MarkupSafe
 mdurl
 mpmath
-pydantic
+pydantic>=2.0.0
 pydantic_core
 pyfiglet
 Pygments
