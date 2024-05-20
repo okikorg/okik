@@ -72,8 +72,12 @@ http POST 0.0.0.0:3000/embedder/version
 
 ## Serving the app
 ```bash
-# run the okik run to start the server
+# run the okik run to start the server in production mode
 okik server
+# or run in dev mode
+okik server --dev --reload
+#or
+okik server -d -r
 ```
 
 ## Build the app
