@@ -1,5 +1,3 @@
-def python_dockerfile(image_name: str):
-    return f"""
 # Use an official Python runtime as a parent image
 FROM python:latest
 
@@ -21,7 +19,6 @@ RUN export PATH="$HOME/.local/bin:$PATH"
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN okik --help
 RUN okik init
-RUN mkdir -p /app/.okik/services
 
 # Upgrade pip and install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
@@ -30,4 +27,3 @@ EXPOSE 3000
 
 # Run okik app
 CMD ["okik", "server"]
-    """

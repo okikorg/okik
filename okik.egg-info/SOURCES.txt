@@ -14,3 +14,4 @@ okik/utils/__init__.py
 okik/utils/configs/__init__.py
 okik/utils/configs/machines.py
 okik/utils/configs/serviceconfigs.py
+okik/utils/configs/yaml_configs.py

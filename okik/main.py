@@ -16,10 +16,11 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 from okik.logger import log_error, log_running, log_start, log_success, log_info
-
+import json
 
 # Initialize Typer app
 typer_app = typer.Typer()
+# Initialize Rich console
 console = Console()
 
 
@@ -41,6 +42,7 @@ def main(ctx: typer.Context):
             "Type 'okik --help' for more commands.", style="dim"
         )  # Helper prompt
 
+
 @typer_app.command()
 def init():
     """
@@ -48,9 +50,25 @@ def init():
     Also login to the Okik cloud.
     """
     log_start("Initializing the project..")
-    folders_list = [".okik/services", ".okik/images"]
+    folders_list = [".okik/services", ".okik/images", ".okik/docker"]
     for folder in folders_list:
         os.makedirs(folder, exist_ok=True)
+
+    # Find the path to the installed okik library
+    okik_spec = importlib.util.find_spec("okik")
+    if okik_spec is None:
+        log_error("Okik library not found. Please ensure it is installed.", err=True)
+        raise typer.Exit(code=1)
+
+    okik_path = okik_spec.submodule_search_locations[0]
+    dockerfile_source = os.path.join(okik_path, "scripts", "dockerfiles", "Dockerfile")
+
+    if not os.path.isfile(dockerfile_source):
+        typer.echo(f"Dockerfile not found at {dockerfile_source}", err=True)
+        raise typer.Exit(code=1)
+
+    # Destination .okik/docker/Dockerfile
+    shutil.copy(dockerfile_source, ".okik/docker/Dockerfile")
     log_success("Services directory checked/created.")
 
 
@@ -261,18 +279,17 @@ def server(
 
     log_info("Server stopped.")
 
-
 @typer_app.command()
-def routes(
+def apply(
     entry_point: str = typer.Option(
         "main.py", "--entry-point", "-e", help="Entry point file"
     ),
 ):
     """
-    Show all routes for the given FastAPI application instance.
+    Creates routes, services, and other resources defined in the entry point file.
     """
     if not os.path.isfile(entry_point):
-        console.print(f"Entry point file '{entry_point}' not found.", style="bold red")
+        console.print(f"Entry point file '[bold red]{entry_point}[/bold red]' not found.", style="bold red")
         return
 
     module_name = os.path.splitext(entry_point)[0]
@@ -284,22 +301,32 @@ def routes(
 
         app = getattr(module, "app", None)
         if app is None:
-            console.print(f"No 'app' instance found in '{entry_point}'.", style="bold red")
+            console.print(f"No 'app' instance found in '[bold red]{entry_point}[/bold red]'.", style="bold red")
             return
 
-        routes_table = Table(title="Application Routes", show_header=True, header_style="bold")
-        routes_table.add_column("Path", justify="left", style="cyan", no_wrap=True)
-        routes_table.add_column("Name", style="magenta")
-        routes_table.add_column("Methods", justify="center", style="green")
-
+        # Organize routes by base path
+        routes_by_base_path = {}
         for route in app.routes:
             if isinstance(route, APIRoute):
-                methods = ", ".join(route.methods)
-                routes_table.add_row(route.path, route.name, methods)
+                base_path = route.path.split("/")[1]  # Get the base path segment
+                if base_path not in routes_by_base_path:
+                    routes_by_base_path[base_path] = []
+                routes_by_base_path[base_path].append(route)
 
-        console.print(routes_table)
+        # Build hierarchical view of routes
+        routes_details = ""
+        for base_path, routes in routes_by_base_path.items():
+            routes_details += f"[bold cyan]Path: /{base_path}/[/bold cyan]\n"
+            for route in routes:
+                methods = ", ".join(route.methods)
+                routes_details += f"    └── [bold]Path:[/bold] {route.path} | [bold]Name:[/bold] {route.name} | [bold]Methods:[/bold] {methods}\n"
+            routes_details += "\n"
+
+        routes_panel = Panel(routes_details, title="[bold green]Application Routes[/bold green]", border_style="green")
+        console.print(routes_panel)
     except Exception as e:
-        console.print(f"Failed to load the entry point module '{entry_point}': {e}", style="bold red")
+        console.print(f"Failed to load the entry point module '[bold red]{entry_point}[/bold red]': {e}", style="bold red")
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
