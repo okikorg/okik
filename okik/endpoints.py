@@ -127,6 +127,27 @@ def create_yaml_resources(cls, replicas: int, resources: ServiceConfigs, backend
         yaml.dump(existing_data, f)
 
 def service(replicas: Optional[int] = 1, resources: Union[dict, ServiceConfigs, None] = None, backend: Optional[str] = None) -> Callable:
+    """
+    Decorator for creating services with specified configurations.
+
+    Args:
+        replicas (Optional[int]): Number of service replicas. Defaults to 1.
+        resources (Union[dict, ServiceConfigs, None]): Resource configurations for the service.
+            Can be a dictionary or a ServiceConfigs instance. Defaults to None.
+        backend (Optional[str]): The backend provisioning system. Defaults to None.
+
+    Returns:
+        Callable: The decorated class.
+
+    Raises:
+        ValueError: If replicas is not a positive integer or resources is not a dictionary when provided.
+        HTTPException: If there is a validation error with the provided resource configurations.
+
+    Example:
+        @service(replicas=2, resources={"type": "cuda"})\n
+        class MyModel:
+            pass
+    """
     # console print the service creation
     log_start("Creating services...")
     log_info(f"replicas: {replicas} | resources: {resources} | backend: {backend}")
@@ -134,8 +155,8 @@ def service(replicas: Optional[int] = 1, resources: Union[dict, ServiceConfigs, 
         log_start(f"Creating service {cls.__name__}...")
         if not isinstance(replicas, int) or replicas < 1:
             raise ValueError("Replicas must be an integer greater than 0")
-        if resources is not None and not isinstance(resources, dict):
-            raise ValueError("Resources, if provided, must be a dictionary")
+        if resources is not None and not isinstance(resources, dict) and not isinstance(resources, ServiceConfigs):
+            raise ValueError("Resources, if provided, must be a dictionary or a ServiceConfigs instance")
         create_route_handlers(cls)
         try:
             service_configs = ServiceConfigs(**resources) if resources else None
@@ -149,6 +170,19 @@ def service(replicas: Optional[int] = 1, resources: Union[dict, ServiceConfigs, 
     return decorator
 
 def api(func: Callable):
+    """
+    Decorator to mark a function as an API endpoint.
+
+    Args:
+        func (Callable): The function to be marked as an endpoint.
+
+    Returns:
+        Callable: The original function marked as an endpoint.
+
+    Example:
+        @api\n
+        def my_endpoint():
+    """
     func.is_endpoint = True
     return func
 

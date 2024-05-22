@@ -64,7 +64,6 @@ def generate_okik_yaml_config(cls: Callable, resources: ServiceConfigs, replicas
             "replicas": replicas,
             "resources": resources.dict() if resources else None,
             "port": 3000,
-            # take the image name from .okik/cache/config.json
             "image": f"{image}"
     }
 

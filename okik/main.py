@@ -2,6 +2,7 @@ import os
 import time
 import pyfiglet
 import shutil
+from torch import backends
 import typer
 from art import text2art
 import subprocess
@@ -47,7 +48,6 @@ def main(ctx: typer.Context):
 def init():
     """
     Initialize the project with the required files and directories.
-    Also login to the Okik cloud.
     """
     log_start("Initializing the project..")
     folders_list = [".okik/services", ".okik/cache", ".okik/docker"]
@@ -91,7 +91,7 @@ def build(
     force_build: bool = typer.Option(False, "--force-build", "-f", help="Force rebuild of the Docker image"),
 ):
     """
-    Take the python function, classes, or .py file, wrap it inside a docker container.
+    Build the Docker image for your app
     """
     start_time = time.time()
     steps = []
@@ -229,7 +229,7 @@ def server(
     dev: bool = typer.Option(False, "--dev", "-d", help="Run in development mode"),
 ):
     """
-    Serve the python function, classes, or .py file on a local server or cloud-based environment.
+    Serve the app in development or production mode.
     """
     if dev:
         console.print(Panel(f"Serving the application with entry point: [bold]{entry_point}[/bold]", title="Okik CLI - Development mode"), style="bold yellow")
@@ -287,7 +287,7 @@ def apply(
     ),
 ):
     """
-    Creates routes, services, and other resources defined in the entry point file.
+    Creates routes, services, and other resources defined in the entry point.
     """
     if not os.path.isfile(entry_point):
         console.print(f"Entry point file '[bold red]{entry_point}[/bold red]' not found.", style="bold red")
@@ -328,6 +328,40 @@ def apply(
     except Exception as e:
         console.print(f"Failed to load the entry point module '[bold red]{entry_point}[/bold red]': {e}", style="bold red")
 
+
+@typer_app.command()
+def deploy(
+    entry_point: str = typer.Option(
+        "main.py", "--entry-point", "-e", help="Entry point file"
+    )
+):
+    """
+    Deploy the application to a cloud or cluster.
+    Warning: This is just a mockup
+    """
+    services_dir = ".okik/services/okik"
+    yaml_files = [f for f in os.listdir(services_dir) if f.endswith('.yaml') or f.endswith('.yml')]
+
+    if not yaml_files:
+        console.print("No YAML configuration files found in the services directory.", style="bold red")
+        return
+
+    for yaml_file in yaml_files:
+        yaml_path = os.path.join(services_dir, yaml_file)
+        with open(yaml_path, 'r') as file:
+            try:
+                yaml_content = yaml.safe_load(file)
+                yaml_content_neat = "\n".join([f"{key}: {value}" for key, value in yaml_content.items()])
+                panel = Panel(Text(yaml_content_neat, justify="left"), title=f"YAML Configuration: {yaml_file}", border_style="blue")
+                console.print(panel)
+            except yaml.YAMLError as exc:
+                console.print(f"Error parsing YAML file '{yaml_file}': {exc}", style="bold red")
+                continue
+
+    answer = typer.confirm("Do you want to continue with the deployment?")
+    if not answer:
+        typer.echo("Deployment stopped by the user.")
+        raise typer.Exit()
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
