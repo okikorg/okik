@@ -1,6 +1,6 @@
 # About
 
-**Okik** is a command-line interface (CLI) that allows users to run various inference services such as LLM, RAG(WIP), or anything in between using various frameworks on any cloud. With **Okik**, you can easily run these services directly on any cloud without the hassle of managing your own infra.
+*Okik* is a command-line interface (CLI) that allows users to run various inference services such as LLM, RAG(WIP), or anything in between using various frameworks on any *cloud. With *Okik*, you can easily run these services directly on any cloud without the hassle of managing your own infra.
 
 ## Installation
 
@@ -70,14 +70,7 @@ class Embedder: # your service class which will be used to serve the requests
 ## Verify the routes
 ```bash
 # run the okik routes to check all available routes
-okik routes
-```
-
-## Test the app
-```bash
-curl -X POST http://0.0.0.0:3000/embedder/version
-# or if you like to use httpie then
-http POST 0.0.0.0:3000/embedder/version
+okik gen
 ```
 
 ## Serving the app
@@ -90,9 +83,17 @@ okik server --dev --reload
 okik server -d -r
 ```
 
+## Test the app
+```bash
+curl -X POST http://0.0.0.0:3000/embedder/version
+# or if you like to use httpie then
+http POST 0.0.0.0:3000/embedder/version
+```
+
+
 ## Build the app
 ```bash
-okik build -d .Dockerfile -a "your_awesome_app" -t latest
+okik build -a "your_awesome_app" -t latest
 ```
 
 ## Status

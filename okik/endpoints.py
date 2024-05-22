@@ -17,7 +17,6 @@ console = Console()
 app = FastAPI()
 router = APIRouter()
 
-
 def create_route_handlers(cls):
     model_instance = cls()
     class_name = cls.__name__.lower()

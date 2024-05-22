@@ -55,7 +55,7 @@ def init():
         {"description": "Creating services directory", "status": "pending"},
         {"description": "Creating cache directory", "status": "pending"},
         {"description": "Creating docker directory", "status": "pending"},
-        {"description": "Copying Dockerfile", "status": "pending"},
+        {"description": "Created Dockerfile", "status": "pending"},
         {"description": "Creating credentials file with token", "status": "pending"}
     ]
 
