@@ -50,7 +50,7 @@ def init():
     Also login to the Okik cloud.
     """
     log_start("Initializing the project..")
-    folders_list = [".okik/services", ".okik/images", ".okik/docker"]
+    folders_list = [".okik/services", ".okik/cache", ".okik/docker"]
     for folder in folders_list:
         os.makedirs(folder, exist_ok=True)
 
@@ -71,14 +71,13 @@ def init():
     shutil.copy(dockerfile_source, ".okik/docker/Dockerfile")
     log_success("Services directory checked/created.")
 
-
 @typer_app.command()
 def build(
     entry_point: str = typer.Option(
         "main.py", "--entry_point", "-e", help="Entry point file"
     ),
     docker_file: str = typer.Option(
-        ..., "--docker-file", "-d", help="Dockerfile name",
+        ".okik/docker/Dockerfile", "--docker-file", "-d", help="Dockerfile name",
     ),
     app_name: str = typer.Option(
         None, "--app-name", "-a", help="Name of the Docker image"
@@ -92,8 +91,7 @@ def build(
     force_build: bool = typer.Option(False, "--force-build", "-f", help="Force rebuild of the Docker image"),
 ):
     """
-    Take the python function, classes, or .py file, wrap it inside a container,
-    and run it on the cloud based on user's configuration.
+    Take the python function, classes, or .py file, wrap it inside a docker container.
     """
     start_time = time.time()
     steps = []
@@ -119,7 +117,7 @@ def build(
             return
         steps.append("Checked entry point file.")
 
-    temp_dir = ".okik_temp"
+    temp_dir = ".okik/temp"
     os.makedirs(temp_dir, exist_ok=True)
 
     with console.status("[bold green]Copying entry point file...") as status:
@@ -140,28 +138,28 @@ def build(
         shutil.copy("requirements.txt", os.path.join(temp_dir, "requirements.txt"))
         steps.append("Copied requirements.txt file to temporary directory.")
 
-    images_dir = ".okik/images"
-    os.makedirs(images_dir, exist_ok=True)
-    image_yaml_path = os.path.join(images_dir, "images.yaml")
+    cache_dir = ".okik/cache/"
+    os.makedirs(cache_dir, exist_ok=True)
+    image_json_path = os.path.join(cache_dir, "configs.json")
 
-    if force_build and os.path.exists(image_yaml_path):
-        os.remove(image_yaml_path)
+    if force_build and os.path.exists(image_json_path):
+        os.remove(image_json_path)
         console.print("Existing image name cleared due to force build.", style="bold red")
 
     existing_app_name = None
-    if os.path.exists(image_yaml_path):
-        with open(image_yaml_path, "r") as yaml_file:
+    if os.path.exists(image_json_path):
+        with open(image_json_path, "r") as json_file:
             try:
-                yaml_content = yaml.safe_load(yaml_file)
-                existing_app_name = yaml_content.get("image_name")
+                json_content = json.load(json_file)
+                existing_app_name = json_content.get("image_name")
                 if existing_app_name:
                     console.print(f"Warning: Existing Docker image '{existing_app_name}' will be overwritten.", style="bold red")
-            except yaml.YAMLError as e:
-                log_error(f"Error reading YAML file: {e}")
+            except json.JSONDecodeError as e:
+                log_error(f"Error reading JSON file: {e}")
 
     if existing_app_name:
         docker_image_name = existing_app_name
-        steps.append(f"Using existing app name from YAML: {docker_image_name}")
+        steps.append(f"Using existing app name from JSON: {docker_image_name}")
     else:
         if not app_name:
             app_name = f"app-{uuid.uuid4()}"
@@ -173,26 +171,29 @@ def build(
             docker_image_name = f"cr.ai.nebius.cloud/{registry_id}/{app_name}:{tag}"
         steps.append(f"Formatted Docker image name: {docker_image_name}")
 
-        # Preserve image name in YAML file
-        with open(image_yaml_path, "w") as yaml_file:
-            yaml.dump({"image_name": docker_image_name}, yaml_file)
-        steps.append("Preserved image name in YAML file.")
+        # Preserve image name in JSON file
+        with open(image_json_path, "w") as json_file:
+            json.dump({"image_name": docker_image_name}, json_file)
+        steps.append("Preserved image name in JSON file.")
 
-    build_command = f"docker build -t {docker_image_name} -f {os.path.join(temp_dir, docker_file)} {temp_dir}"
+    build_command = f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
     with console.status("[bold green]Building Docker image...") as status:
         if verbose:
             process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             while True:
                 output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
+                if not output and process.poll() is not None:
                     break
                 if output:
                     console.print(output.strip())
-            stderr = process.stderr.read()
-            if stderr:
-                console.print(stderr, style="bold red")
+            # Read any remaining output from stderr (error stream)
+            stderr_output = process.stderr.readlines()
+            for error in stderr_output:
+                console.print(error.strip(), style="bold red")
         else:
-            subprocess.run(build_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            result = subprocess.run(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode != 0:
+                console.print(result.stderr, style="bold red")
         steps.append(f"Built Docker image '{docker_image_name}'.")
 
     with console.status("[bold green]Cleaning up temporary directory...") as status:
@@ -316,10 +317,10 @@ def apply(
         # Build hierarchical view of routes
         routes_details = ""
         for base_path, routes in routes_by_base_path.items():
-            routes_details += f"[bold cyan]Path: /{base_path}/[/bold cyan]\n"
+            routes_details += f"[bold cyan]root: <HOST>/{base_path}/[/bold cyan]\n"
             for route in routes:
                 methods = ", ".join(route.methods)
-                routes_details += f"    └── [bold]Path:[/bold] {route.path} | [bold]Name:[/bold] {route.name} | [bold]Methods:[/bold] {methods}\n"
+                routes_details += f"    └── [bold]r:[/bold] {route.path} | [bold]Methods:[/bold] {methods}\n"
             routes_details += "\n"
 
         routes_panel = Panel(routes_details, title="[bold green]Application Routes[/bold green]", border_style="green")

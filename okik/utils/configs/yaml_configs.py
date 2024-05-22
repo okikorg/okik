@@ -1,5 +1,7 @@
 from typing_extensions import Callable
 from okik.utils.configs.serviceconfigs import ServiceConfigs
+from enum import Enum
+from pydantic import BaseModel
 
 def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas: int) -> dict:
     return {
@@ -49,12 +51,11 @@ def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas:
         }
     }
 
-
 def generate_okik_yaml_config(cls: Callable, resources: ServiceConfigs, replicas: int) -> dict:
     return {
         cls.__name__.lower(): {
             "name": cls.__name__.lower(),
-            "kind": "service",
+            "kind": "Deployment",
             "replicas": replicas,
             "resources": resources.dict() if resources else None
         }

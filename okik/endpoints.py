@@ -17,6 +17,7 @@ console = Console()
 app = FastAPI()
 router = APIRouter()
 
+
 def create_route_handlers(cls):
     model_instance = cls()
     class_name = cls.__name__.lower()
@@ -78,16 +79,21 @@ def create_yaml_resources(cls, replicas: int, resources: ServiceConfigs, backend
     yaml.add_representer(AcceleratorType, enum_representer)
 
     if backend == "k8":
-        k8s_yaml = generate_k8s_yaml_config(cls, resources, replicas)
-        file_path = f".okik/k8/services/{cls.__name__.lower()}-config.yaml"
+            k8s_yaml = generate_k8s_yaml_config(cls, resources, replicas)
+            file_path = f".okik/services/k8/{cls.__name__.lower()}-config.yaml"
     elif backend == "okik":
-        okik_yaml = generate_okik_yaml_config(cls, resources, replicas)
-        file_path = f".okik/services/serviceconfig.yaml"
-    else:  # Placeholder for 'sky' style
-        sky_yaml = {
-            # Placeholder for the 'sky' YAML format
-        }
-        file_path = f".sky/services/{cls.__name__.lower()}-config.yaml"
+            okik_yaml = generate_okik_yaml_config(cls, resources, replicas)
+            file_path = f".okik/services/okik/serviceconfig.yaml"
+    elif backend == "ray":
+        raise NotImplementedError("Ray backend is not yet implemented")
+        ray_yaml = {}
+        file_path = f".okik/services/ray/{cls.__name__.lower()}-config.yaml"
+    elif backend == "sky":
+        raise NotImplementedError("Sky backend is not yet implemented")
+        sky_yaml = {}
+        file_path = f".okik/services/sky/{cls.__name__.lower()}-config.yaml"
+    else:
+        raise ValueError(f"Invalid backend. Must be one of {list(BackendType.__members__.keys())}")
 
     # Load existing data if the file exists
     if os.path.exists(file_path):
@@ -105,6 +111,9 @@ def create_yaml_resources(cls, replicas: int, resources: ServiceConfigs, backend
         new_service_config = k8s_yaml
     elif backend == "okik":
         new_service_config = okik_yaml
+    elif backend == "ray":
+        # new_service_config = ray_yaml
+        raise NotImplementedError("Ray style is not yet implemented")
     else:  # Placeholder for 'sky' style
         # new_service_config = sky_yaml
         raise NotImplementedError("Sky style is not yet implemented")
