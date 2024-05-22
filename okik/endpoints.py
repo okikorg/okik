@@ -67,6 +67,9 @@ def serialize_result(result: Any):
 
 
 def create_yaml_resources(cls, replicas: int, resources: ServiceConfigs, backend: ProvisioningBackend):
+    k8s_yaml = {}
+    okik_yaml = {}
+
     log_start(f"Creating YAML for {cls.__name__}...")
     log_info(f"cls: {cls} | replicas: {replicas} | resources: {resources} | backend: {backend}")
     if backend not in BackendType.__members__.values():
@@ -126,7 +129,7 @@ def create_yaml_resources(cls, replicas: int, resources: ServiceConfigs, backend
     with open(file_path, "w") as f:
         yaml.dump(existing_data, f)
 
-def service(replicas: Optional[int] = 1, resources: Union[dict, ServiceConfigs, None] = None, backend: Optional[str] = None) -> Callable:
+def service(replicas: Optional[int] = 1, resources: Optional[Union[dict, ServiceConfigs]] = {}, backend: Optional[str] = "okik") -> Callable:
     """
     Decorator for creating services with specified configurations.
 
@@ -183,7 +186,7 @@ def api(func: Callable):
         @api\n
         def my_endpoint():
     """
-    func.is_endpoint = True
+    func.is_endpoint = True # type: ignore
     return func
 
 app.include_router(router)

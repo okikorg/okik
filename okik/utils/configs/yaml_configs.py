@@ -59,12 +59,21 @@ def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas:
 
 def generate_okik_yaml_config(cls: Callable, resources: ServiceConfigs, replicas: int) -> dict:
     return {
+        "kind": "service",
+        "replicas": replicas,
+        "resources": resources.dict() if resources else None,
+        "port": 3000,
+        "image": f"{image}",
+        "metadata": {
             "name": cls.__name__.lower(),
-            "kind": "service",
-            "replicas": replicas,
-            "resources": resources.dict() if resources else None,
-            "port": 3000,
-            "image": f"{image}"
+            "token": "1234567890",
+
+        },
+        "ssh": {
+            "enabled": True,
+            "port": 22,
+            "key": ""
+        }
     }
 
 
