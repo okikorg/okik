@@ -1,6 +1,6 @@
 # About
 
-**Okik** is a command-line interface (CLI) that allows users to run various inference services such as LLM, RAG(WIP), or anything in between using various frameworks on any cloud. With **Okik**, you can easily run these services directly on any cloud without the hassle of managing your own infra.
+*Okik* is a command-line interface (CLI) that allows users to run various inference services such as LLM, RAG(WIP), or anything in between using various frameworks on any *cloud. With *Okik*, you can easily run these services directly on any cloud without the hassle of managing your own infra.
 
 ## Installation
 
@@ -13,8 +13,19 @@ To install Okik, follow these steps:
 ## Quick Start
 
 To run Okik, simply execute the following command in your terminal:
-`okik` or `okik --help`
+`okik`
+```
+██████  ██   ██ ██ ██   ██
+██    ██ ██  ██  ██ ██  ██
+██    ██ █████   ██ █████
+██    ██ ██  ██  ██ ██  ██
+██████  ██   ██ ██ ██   ██
 
+
+
+Simplify. Deploy. Scale.
+Type 'okik --help' for more commands.
+```
 
 ## Initialise the project
 ```bash
@@ -25,22 +36,22 @@ okik init
 Write this in your `main.py` file:
 
 ```python
-from okik.endpoints import service, api, app, AcceleratorConfigs, ServiceConfigs
+from okik.endpoints import service, api, app
 from sentence_transformers import SentenceTransformer
 import sentence_transformers
 from torch.nn.functional import cosine_similarity as cosine
 import torch
 
-
+# your service configuration
 @service(
     replicas=2,
     resources={"accelerator": {"type": "cuda", "device": "A40", "count": 2}}
 )
-class Embedder:
+class Embedder: # your service class which will be used to serve the requests
     def __init__(self):
         self.model = SentenceTransformer("paraphrase-MiniLM-L6-v2", cache_folder=".okik/cache")
 
-    @api
+    @api # your api endpoint
     def embed(self, sentence: str):
         logits = self.model.encode(sentence)
         return logits
@@ -54,13 +65,22 @@ class Embedder:
     @api
     def version(self):
         return sentence_transformers.__version__
-
 ```
 
 ## Verify the routes
 ```bash
 # run the okik routes to check all available routes
-okik routes
+okik gen
+```
+
+## Serving the app
+```bash
+# run the okik run to start the server in production mode
+okik server
+# or run in dev mode
+okik server --dev --reload
+#or
+okik server -d -r
 ```
 
 ## Test the app
@@ -70,15 +90,10 @@ curl -X POST http://0.0.0.0:3000/embedder/version
 http POST 0.0.0.0:3000/embedder/version
 ```
 
-## Serving the app
-```bash
-# run the okik run to start the server
-okik server
-```
 
 ## Build the app
 ```bash
-okik build -d .Dockerfile -a "your_awesome_app" -t latest
+okik build -a "your_awesome_app" -t latest
 ```
 
 ## Status

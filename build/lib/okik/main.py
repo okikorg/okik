@@ -41,6 +41,20 @@ def main(ctx: typer.Context):
             "Type 'okik --help' for more commands.", style="dim"
         )  # Helper prompt
 
+# @typer_app.command()
+# def init():
+#     """
+#     Initialize the project with the required files and directories.
+#     Also login to the Okik cloud.
+#     """
+#     log_start("Initializing the project..")
+#     folders_list = [".okik/services", ".okik/images", ".okik/docker"]
+#     for folder in folders_list:
+#         os.makedirs(folder, exist_ok=True)
+#     # copy the Dockerfile from scrips/dockerfiles/Dockerfile to the project directory
+#     shutil.copy("scripts/dockerfiles/Dockerfile", "Dockerfile")
+#     log_success("Services directory checked/created.")
+
 @typer_app.command()
 def init():
     """
@@ -48,11 +62,26 @@ def init():
     Also login to the Okik cloud.
     """
     log_start("Initializing the project..")
-    folders_list = [".okik/services", ".okik/images"]
+    folders_list = [".okik/services", ".okik/images", ".okik/docker"]
     for folder in folders_list:
         os.makedirs(folder, exist_ok=True)
-    log_success("Services directory checked/created.")
 
+    # Find the path to the installed okik library
+    okik_spec = importlib.util.find_spec("okik")
+    if okik_spec is None:
+        log_error("Okik library not found. Please ensure it is installed.", err=True)
+        raise typer.Exit(code=1)
+
+    okik_path = okik_spec.submodule_search_locations[0]
+    dockerfile_source = os.path.join(okik_path, "scripts", "dockerfiles", "Dockerfile")
+
+    if not os.path.isfile(dockerfile_source):
+        typer.echo(f"Dockerfile not found at {dockerfile_source}", err=True)
+        raise typer.Exit(code=1)
+
+    # Copy the Dockerfile to the project directory
+    shutil.copy(dockerfile_source, "Dockerfile")
+    log_success("Services directory checked/created.")
 
 @typer_app.command()
 def build(

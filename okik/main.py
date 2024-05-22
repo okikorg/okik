@@ -2,6 +2,7 @@ import os
 import time
 import pyfiglet
 import shutil
+from torch import backends
 import typer
 from art import text2art
 import subprocess
@@ -16,10 +17,13 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 from okik.logger import log_error, log_running, log_start, log_success, log_info
-
+import json
+from rich.progress import Progress
+from rich.tree import Tree
 
 # Initialize Typer app
 typer_app = typer.Typer()
+# Initialize Rich console
 console = Console()
 
 
@@ -41,18 +45,67 @@ def main(ctx: typer.Context):
             "Type 'okik --help' for more commands.", style="dim"
         )  # Helper prompt
 
+
 @typer_app.command()
 def init():
     """
     Initialize the project with the required files and directories.
-    Also login to the Okik cloud.
     """
-    log_start("Initializing the project..")
-    folders_list = [".okik/services", ".okik/images"]
-    for folder in folders_list:
-        os.makedirs(folder, exist_ok=True)
-    log_success("Services directory checked/created.")
+    tasks = [
+        {"description": "Creating services directory", "status": "pending"},
+        {"description": "Creating cache directory", "status": "pending"},
+        {"description": "Creating docker directory", "status": "pending"},
+        {"description": "Created Dockerfile", "status": "pending"},
+        {"description": "Creating credentials file with token", "status": "pending"}
+    ]
 
+    with console.status("[bold green]Initializing the project...") as status:
+
+        # Create directories
+        folders_list = [".okik/services", ".okik/cache", ".okik/docker"]
+        for folder in folders_list:
+            os.makedirs(folder, exist_ok=True)
+            tasks[folders_list.index(folder)]["status"] = "completed"
+
+        # Find the path to the installed okik library
+        okik_spec = importlib.util.find_spec("okik")
+        if okik_spec is None:
+            tasks[3]["status"] = "failed"
+            console.print("Okik library not found. Please ensure it is installed.", style="bold red")
+            raise typer.Exit(code=1)
+
+        okik_path = okik_spec.submodule_search_locations[0]
+        dockerfile_source = os.path.join(okik_path, "scripts", "dockerfiles", "Dockerfile")
+
+        if not os.path.isfile(dockerfile_source):
+            tasks[3]["status"] = "failed"
+            console.print(f"Dockerfile not found at {dockerfile_source}", style="bold red")
+            raise typer.Exit(code=1)
+
+        # Destination .okik/docker/Dockerfile
+        shutil.copy(dockerfile_source, ".okik/docker/Dockerfile")
+        tasks[3]["status"] = "completed"
+
+        # Create okik folder in home directory and add credentials.json with token
+        home_dir = os.path.expanduser("~")
+        okik_home_dir = os.path.join(home_dir, "okik")
+        os.makedirs(okik_home_dir, exist_ok=True)
+        credentials_path = os.path.join(okik_home_dir, "credentials.json")
+
+        if not os.path.exists(credentials_path):
+            token = str(uuid.uuid4())
+            credentials = {"token": token}
+            with open(credentials_path, "w") as credentials_file:
+                json.dump(credentials, credentials_file)
+            tasks[4]["status"] = "completed"
+        else:
+            tasks[4]["status"] = "skipped"
+
+    # Display task statuses
+    status_styles = {"completed": "bold green", "failed": "bold red", "skipped": "bold yellow", "pending": "bold"}
+
+    for task in tasks:
+        console.print(f"[{status_styles[task['status']]}] - {task['description']} [/{status_styles[task['status']]}]")
 
 @typer_app.command()
 def build(
@@ -60,7 +113,7 @@ def build(
         "main.py", "--entry_point", "-e", help="Entry point file"
     ),
     docker_file: str = typer.Option(
-        ..., "--docker-file", "-d", help="Dockerfile name",
+        ".okik/docker/Dockerfile", "--docker-file", "-d", help="Dockerfile name",
     ),
     app_name: str = typer.Option(
         None, "--app-name", "-a", help="Name of the Docker image"
@@ -74,8 +127,7 @@ def build(
     force_build: bool = typer.Option(False, "--force-build", "-f", help="Force rebuild of the Docker image"),
 ):
     """
-    Take the python function, classes, or .py file, wrap it inside a container,
-    and run it on the cloud based on user's configuration.
+    Build the Docker image for your app
     """
     start_time = time.time()
     steps = []
@@ -92,8 +144,7 @@ def build(
         "Force Build": force_build
     }
     arguments_text = "\n".join([f"{key}: {value}" for key, value in arguments.items()])
-    panel = Panel(Text(arguments_text, justify="left"), title="Arguments Passed", border_style="blue")
-    console.print(panel)
+    console.print(arguments_text, style="bold blue")
 
     with console.status("[bold green]Checking entry point file...") as status:
         if not os.path.isfile(entry_point):
@@ -101,7 +152,7 @@ def build(
             return
         steps.append("Checked entry point file.")
 
-    temp_dir = ".okik_temp"
+    temp_dir = ".okik/temp"
     os.makedirs(temp_dir, exist_ok=True)
 
     with console.status("[bold green]Copying entry point file...") as status:
@@ -122,28 +173,28 @@ def build(
         shutil.copy("requirements.txt", os.path.join(temp_dir, "requirements.txt"))
         steps.append("Copied requirements.txt file to temporary directory.")
 
-    images_dir = ".okik/images"
-    os.makedirs(images_dir, exist_ok=True)
-    image_yaml_path = os.path.join(images_dir, "images.yaml")
+    cache_dir = ".okik/cache/"
+    os.makedirs(cache_dir, exist_ok=True)
+    image_json_path = os.path.join(cache_dir, "configs.json")
 
-    if force_build and os.path.exists(image_yaml_path):
-        os.remove(image_yaml_path)
+    if force_build and os.path.exists(image_json_path):
+        os.remove(image_json_path)
         console.print("Existing image name cleared due to force build.", style="bold red")
 
     existing_app_name = None
-    if os.path.exists(image_yaml_path):
-        with open(image_yaml_path, "r") as yaml_file:
+    if os.path.exists(image_json_path):
+        with open(image_json_path, "r") as json_file:
             try:
-                yaml_content = yaml.safe_load(yaml_file)
-                existing_app_name = yaml_content.get("image_name")
+                json_content = json.load(json_file)
+                existing_app_name = json_content.get("image_name")
                 if existing_app_name:
                     console.print(f"Warning: Existing Docker image '{existing_app_name}' will be overwritten.", style="bold red")
-            except yaml.YAMLError as e:
-                log_error(f"Error reading YAML file: {e}")
+            except json.JSONDecodeError as e:
+                log_error(f"Error reading JSON file: {e}")
 
     if existing_app_name:
         docker_image_name = existing_app_name
-        steps.append(f"Using existing app name from YAML: {docker_image_name}")
+        steps.append(f"Using existing app name from JSON: {docker_image_name}")
     else:
         if not app_name:
             app_name = f"app-{uuid.uuid4()}"
@@ -155,26 +206,29 @@ def build(
             docker_image_name = f"cr.ai.nebius.cloud/{registry_id}/{app_name}:{tag}"
         steps.append(f"Formatted Docker image name: {docker_image_name}")
 
-        # Preserve image name in YAML file
-        with open(image_yaml_path, "w") as yaml_file:
-            yaml.dump({"image_name": docker_image_name}, yaml_file)
-        steps.append("Preserved image name in YAML file.")
+        # Preserve image name in JSON file
+        with open(image_json_path, "w") as json_file:
+            json.dump({"image_name": docker_image_name, "name": app_name}, json_file)
+        steps.append("Preserved image name in JSON file.")
 
-    build_command = f"docker build -t {docker_image_name} -f {os.path.join(temp_dir, docker_file)} {temp_dir}"
+    build_command = f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
     with console.status("[bold green]Building Docker image...") as status:
         if verbose:
             process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             while True:
                 output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
+                if not output and process.poll() is not None:
                     break
                 if output:
                     console.print(output.strip())
-            stderr = process.stderr.read()
-            if stderr:
-                console.print(stderr, style="bold red")
+            # Read any remaining output from stderr (error stream)
+            stderr_output = process.stderr.readlines()
+            for error in stderr_output:
+                console.print(error.strip(), style="bold red")
         else:
-            subprocess.run(build_command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            result = subprocess.run(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode != 0:
+                console.print(result.stderr, style="bold red")
         steps.append(f"Built Docker image '{docker_image_name}'.")
 
     with console.status("[bold green]Cleaning up temporary directory...") as status:
@@ -189,11 +243,9 @@ def build(
     # Prompt the user to build the image with more details with --verbose flag
     steps.append("Build the image with more details using the --verbose flag if you want to see more details.")
 
-    # Display all steps inside a panel
-    steps_text = "\n".join(steps)
-    panel = Panel(Text(steps_text, justify="left"), title="Build Process Steps", border_style="green")
-    console.print(panel)
-
+    # Display all steps
+    for step in steps:
+        console.print(step, style="bold green")
 
 @typer_app.command()
 def server(
@@ -210,7 +262,7 @@ def server(
     dev: bool = typer.Option(False, "--dev", "-d", help="Run in development mode"),
 ):
     """
-    Serve the python function, classes, or .py file on a local server or cloud-based environment.
+    Serve the app in development or production mode.
     """
     if dev:
         console.print(Panel(f"Serving the application with entry point: [bold]{entry_point}[/bold]", title="Okik CLI - Development mode"), style="bold yellow")
@@ -262,17 +314,17 @@ def server(
     log_info("Server stopped.")
 
 
-@typer_app.command()
-def routes(
+@typer_app.command(name="gen")
+def gen(
     entry_point: str = typer.Option(
         "main.py", "--entry-point", "-e", help="Entry point file"
     ),
 ):
     """
-    Show all routes for the given FastAPI application instance.
+    Creates routes, services, and other resources defined in the entry point.
     """
     if not os.path.isfile(entry_point):
-        console.print(f"Entry point file '{entry_point}' not found.", style="bold red")
+        console.print(f"Entry point file '[bold red]{entry_point}[/bold red]' not found.", style="bold red")
         return
 
     module_name = os.path.splitext(entry_point)[0]
@@ -284,22 +336,79 @@ def routes(
 
         app = getattr(module, "app", None)
         if app is None:
-            console.print(f"No 'app' instance found in '{entry_point}'.", style="bold red")
+            console.print(f"No 'app' instance found in '[bold red]{entry_point}[/bold red]'.", style="bold red")
             return
 
-        routes_table = Table(title="Application Routes", show_header=True, header_style="bold")
-        routes_table.add_column("Path", justify="left", style="cyan", no_wrap=True)
-        routes_table.add_column("Name", style="magenta")
-        routes_table.add_column("Methods", justify="center", style="green")
-
+        # Organize routes by base path and build Rich Tree
+        routes_tree = Tree(f"[bold cyan]{entry_point}[/bold cyan] Application Routes")
+        routes_by_base_path = {}
         for route in app.routes:
             if isinstance(route, APIRoute):
-                methods = ", ".join(route.methods)
-                routes_table.add_row(route.path, route.name, methods)
+                base_path = route.path.split("/")[1]  # Get the base path segment
+                if base_path not in routes_by_base_path:
+                    routes_by_base_path[base_path] = Tree(f"[bold cyan]<HOST>/{base_path}/[/bold cyan]")
+                    routes_tree.add(routes_by_base_path[base_path])
+                routes_by_base_path[base_path].add(f"[green]{route.path}[/green] | [green]{', '.join(route.methods)}[/green]")
 
-        console.print(routes_table)
+        console.print(routes_tree)
     except Exception as e:
-        console.print(f"Failed to load the entry point module '{entry_point}': {e}", style="bold red")
+        console.print(f"Failed to load the entry point module '[bold red]{entry_point}[/bold red]': {e}", style="bold red")
+
+@typer_app.command(name="mock-deploy")
+def deploy(
+    entry_point: str = typer.Option(
+        "main.py", "--entry-point", "-e", help="Entry point file"
+    )
+):
+    """
+    Deploy the application to a cloud or cluster.
+    Warning: This is just a mockup
+    """
+    services_dir = ".okik/services/okik"
+    yaml_files = [f for f in os.listdir(services_dir) if f.endswith('.yaml') or f.endswith('.yml')]
+
+    if not yaml_files:
+        console.print("No YAML configuration files found in the services directory.", style="bold red")
+        return
+
+    for yaml_file in yaml_files:
+        yaml_path = os.path.join(services_dir, yaml_file)
+        with open(yaml_path, 'r') as file:
+            try:
+                yaml_content = yaml.safe_load(file)
+                yaml_content_neat = "\n".join([f"{key}: {value}" for key, value in yaml_content.items()])
+                panel = Panel(Text(yaml_content_neat, justify="left"), title=f"YAML Configuration: {yaml_file}", border_style="blue")
+                console.print(panel)
+            except yaml.YAMLError as exc:
+                console.print(f"Error parsing YAML file '{yaml_file}': {exc}", style="bold red")
+                continue
+
+    answer = typer.confirm("Do you want to continue with the deployment?")
+    # Mock deployment process with async sleep
+    if answer:
+        with Progress() as progress:
+            task = progress.add_task("Deploying...", total=100)
+            for i in range(100):
+                progress.update(task, advance=1)
+                time.sleep(0.05)
+        console.print("Deployment completed successfully!", style="bold green")
+
+    if not answer:
+        typer.echo("Deployment stopped by the user.")
+        raise typer.Exit()
+
+# mock show deployment
+@typer_app.command("mock-show-deployment")
+def show_deployment():
+    """
+    Show the deployment status of the application.
+    """
+    with Progress() as progress:
+        task = progress.add_task("Fetching deployment status...", total=100)
+        for i in range(100):
+            progress.update(task, advance=1)
+            time.sleep(0.05)
+    console.print("Deployment status: [bold green]Running[/bold green]")
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
