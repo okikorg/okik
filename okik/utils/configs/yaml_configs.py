@@ -2,6 +2,12 @@ from typing_extensions import Callable
 from okik.utils.configs.serviceconfigs import ServiceConfigs
 from enum import Enum
 from pydantic import BaseModel
+import os
+import json
+
+image_path = os.path.join(".okik/cache/configs.json")
+with open(image_path, "r") as f:
+    image = json.load(f)["image_name"]
 
 def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas: int) -> dict:
     return {
@@ -27,7 +33,7 @@ def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas:
                     "containers": [
                         {
                             "name": f"{cls.__name__.lower()}-container",
-                            "image": f"your-{cls.__name__.lower()}-image:latest",
+                            "image": f"{image}",
                             "resources": {
                                 "limits": {
                                     "nvidia.com/gpu": resources.accelerator.count,
@@ -53,12 +59,13 @@ def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas:
 
 def generate_okik_yaml_config(cls: Callable, resources: ServiceConfigs, replicas: int) -> dict:
     return {
-        cls.__name__.lower(): {
             "name": cls.__name__.lower(),
-            "kind": "Deployment",
+            "kind": "service",
             "replicas": replicas,
-            "resources": resources.dict() if resources else None
-        }
+            "resources": resources.dict() if resources else None,
+            "port": 3000,
+            # take the image name from .okik/cache/config.json
+            "image": f"{image}"
     }
 
 
