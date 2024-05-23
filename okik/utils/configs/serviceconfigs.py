@@ -12,10 +12,10 @@ class ServiceConfigs(BaseModel):
     accelerator: AcceleratorConfigs
 
 class BackendType(str, Enum):
-    k8 = "k8"
-    okik = "okik"
-    sky = "sky"
-    ray = "ray"
+    k8: str = "k8"
+    okik: str  = "okik"
+    sky: str  = "sky"
+    ray: str  = "ray"
 
 class ProvisioningBackend(BaseModel):
     backend: BackendType

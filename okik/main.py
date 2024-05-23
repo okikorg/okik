@@ -59,7 +59,7 @@ def init():
         {"description": "Creating docker directory", "status": "pending"},
         {"description": "Created Dockerfile", "status": "pending"},
         {"description": "Creating credentials file with token", "status": "pending"},
-        {"description": "Create configs.json file in cache directory", "status": "pending"}
+        {"description": "Create configs.json file in config directory", "status": "pending"}
     ]
 
     docker_dir = ProjectDir.DOCKER_DIR.value
@@ -109,7 +109,7 @@ def init():
         configs_path = os.path.join(config_dir, "configs.json")
         if not os.path.exists(configs_path):
             with open(configs_path, "w") as configs_file:
-                json.dump({'image_name': ''}, configs_file)
+                json.dump({'image_name': '', 'app_name': ''}, configs_file)
             tasks[5]["status"] = "completed"
         else:
             tasks[5]["status"] = "skipped"
@@ -145,7 +145,7 @@ def build(
     start_time = time.time()
     steps = []
     temp_dir = ProjectDir.TEMP_DIR.value
-    cache_dir = ProjectDir.CACHE_DIR.value
+    config_dir = ProjectDir.CONFIG_DIR.value
 
     # Display arguments passed
     arguments = {
@@ -187,8 +187,8 @@ def build(
         shutil.copy("requirements.txt", os.path.join(temp_dir, "requirements.txt"))
         steps.append("Copied requirements.txt file to temporary directory.")
 
-    os.makedirs(cache_dir, exist_ok=True)
-    image_json_path = os.path.join(cache_dir, "configs.json")
+    os.makedirs(config_dir, exist_ok=True)
+    image_json_path = os.path.join(config_dir, "configs.json")
 
     if force_build and os.path.exists(image_json_path):
         os.remove(image_json_path)
@@ -221,7 +221,7 @@ def build(
 
         # Preserve image name in JSON file
         with open(image_json_path, "w") as json_file:
-            json.dump({"image_name": docker_image_name, "name": app_name}, json_file)
+            json.dump({"image_name": docker_image_name, "app_name": app_name}, json_file)
         steps.append("Preserved image name in JSON file.")
 
     build_command = f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"

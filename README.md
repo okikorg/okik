@@ -45,7 +45,8 @@ import torch
 # your service configuration
 @service(
     replicas=2,
-    resources={"accelerator": {"type": "cuda", "device": "A40", "count": 2}}
+    resources={"accelerator": {"type": "cuda", "device": "A40", "count": 2}},
+    backend="okik" # provisioning backend
 )
 class Embedder: # your service class which will be used to serve the requests
     def __init__(self):
@@ -70,7 +71,7 @@ class Embedder: # your service class which will be used to serve the requests
 ## Verify the routes
 ```bash
 # run the okik routes to check all available routes
-okik gen
+okik routes
 ```
 
 ## Serving the app

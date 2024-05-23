@@ -11,13 +11,14 @@ def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas:
     # read image name from .okik/configs/configs.json
     with open(os.path.join(ProjectDir.CONFIG_DIR.value, "configs.json"), "r") as f:
         configs = json.load(f)
-        image = configs["image_name"]
-
+        image_name = configs["image_name"]
+        app_name = configs["app_name"]
     return {
         "apiVersion": "apps/v1",
         "kind": "Deployment",
         "metadata": {
-            "name": cls.__name__.lower()
+            "name": cls.__name__.lower(),
+            "app_name": f"{app_name}"
         },
         "spec": {
             "replicas": replicas,
@@ -36,7 +37,7 @@ def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas:
                     "containers": [
                         {
                             "name": f"{cls.__name__.lower()}-container",
-                            "image": f"{image}",
+                            "image": f"{image_name}",
                             "resources": {
                                 "limits": {
                                     "nvidia.com/gpu": resources.accelerator.count,
@@ -64,16 +65,18 @@ def generate_okik_yaml_config(cls: Callable, resources: ServiceConfigs, replicas
     # read image name from .okik/configs/configs.json
     with open(os.path.join(ProjectDir.CONFIG_DIR.value, "configs.json"), "r") as f:
         configs = json.load(f)
-        image = configs["image_name"]
+        image_name = configs["image_name"]
+        app_name = configs["app_name"]
 
     return {
         "kind": "service",
         "replicas": replicas,
         "resources": resources.dict() if resources else None,
         "port": 3000,
-        "image": f"{image}",
+        "image": f"{image_name}",
         "metadata": {
             "name": cls.__name__.lower(),
+            "app": f'{app_name}',
             "token": "1234567890",
 
         },
