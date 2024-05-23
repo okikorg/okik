@@ -33,3 +33,6 @@ venv.bak/
 
 # log stuff:
 *.log
+
+# Ensure Dockerfile is not ignored
+!Dockerfile

@@ -1,6 +1,7 @@
 README.md
 setup.py
 okik/__init__.py
+okik/consts.py
 okik/endpoints.py
 okik/logger.py
 okik/main.py
