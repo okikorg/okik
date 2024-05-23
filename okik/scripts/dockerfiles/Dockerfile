@@ -12,13 +12,18 @@ COPY . /app
 
 # Install okik and its dependencies
 RUN pip install --upgrade pip
+# create a virtual environment
+RUN python3 -m venv venv
+# activate the virtual environment
+RUN . venv/bin/activate
+# install okik
 RUN git clone https://github.com/okikorg/okik.git
 RUN pip install ./okik
-RUN pip install numpy
 RUN export PATH="$HOME/.local/bin:$PATH"
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN okik --help
+RUN which okik
 RUN okik init
+RUN okik
 
 # Upgrade pip and install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
