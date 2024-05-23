@@ -4,12 +4,15 @@ from enum import Enum
 from pydantic import BaseModel
 import os
 import json
+from okik.consts import ProjectDir
 
-image_path = os.path.join(".okik/cache/configs.json")
-with open(image_path, "r") as f:
-    image = json.load(f)["image_name"]
 
 def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas: int) -> dict:
+    # read image name from .okik/configs/configs.json
+    with open(os.path.join(ProjectDir.CONFIG_DIR.value, "configs.json"), "r") as f:
+        configs = json.load(f)
+        image = configs["image_name"]
+
     return {
         "apiVersion": "apps/v1",
         "kind": "Deployment",
@@ -58,6 +61,11 @@ def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas:
     }
 
 def generate_okik_yaml_config(cls: Callable, resources: ServiceConfigs, replicas: int) -> dict:
+    # read image name from .okik/configs/configs.json
+    with open(os.path.join(ProjectDir.CONFIG_DIR.value, "configs.json"), "r") as f:
+        configs = json.load(f)
+        image = configs["image_name"]
+
     return {
         "kind": "service",
         "replicas": replicas,

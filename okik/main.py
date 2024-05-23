@@ -17,6 +17,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 from okik.logger import log_error, log_running, log_start, log_success, log_info
+from okik.consts import ProjectDir
 import json
 from rich.progress import Progress
 from rich.tree import Tree
@@ -25,6 +26,7 @@ from rich.tree import Tree
 typer_app = typer.Typer()
 # Initialize Rich console
 console = Console()
+
 
 
 @typer_app.callback(invoke_without_command=True)
@@ -56,13 +58,15 @@ def init():
         {"description": "Creating cache directory", "status": "pending"},
         {"description": "Creating docker directory", "status": "pending"},
         {"description": "Created Dockerfile", "status": "pending"},
-        {"description": "Creating credentials file with token", "status": "pending"}
+        {"description": "Creating credentials file with token", "status": "pending"},
+        {"description": "Create configs.json file in cache directory", "status": "pending"}
     ]
 
+    docker_dir = ProjectDir.DOCKER_DIR.value
+    config_dir = ProjectDir.CONFIG_DIR.value
     with console.status("[bold green]Initializing the project...") as status:
-
         # Create directories
-        folders_list = [".okik/services", ".okik/cache", ".okik/docker"]
+        folders_list = [dir.value for dir in ProjectDir]
         for folder in folders_list:
             os.makedirs(folder, exist_ok=True)
             tasks[folders_list.index(folder)]["status"] = "completed"
@@ -83,7 +87,7 @@ def init():
             raise typer.Exit(code=1)
 
         # Destination .okik/docker/Dockerfile
-        shutil.copy(dockerfile_source, ".okik/docker/Dockerfile")
+        shutil.copy(dockerfile_source, f'{docker_dir}/Dockerfile')
         tasks[3]["status"] = "completed"
 
         # Create okik folder in home directory and add credentials.json with token
@@ -100,6 +104,15 @@ def init():
             tasks[4]["status"] = "completed"
         else:
             tasks[4]["status"] = "skipped"
+
+        # Create configs.json in cache directory if not exists
+        configs_path = os.path.join(config_dir, "configs.json")
+        if not os.path.exists(configs_path):
+            with open(configs_path, "w") as configs_file:
+                json.dump({'image_name': ''}, configs_file)
+            tasks[5]["status"] = "completed"
+        else:
+            tasks[5]["status"] = "skipped"
 
     # Display task statuses
     status_styles = {"completed": "bold green", "failed": "bold red", "skipped": "bold yellow", "pending": "bold"}
@@ -131,6 +144,8 @@ def build(
     """
     start_time = time.time()
     steps = []
+    temp_dir = ProjectDir.TEMP_DIR.value
+    cache_dir = ProjectDir.CACHE_DIR.value
 
     # Display arguments passed
     arguments = {
@@ -152,7 +167,6 @@ def build(
             return
         steps.append("Checked entry point file.")
 
-    temp_dir = ".okik/temp"
     os.makedirs(temp_dir, exist_ok=True)
 
     with console.status("[bold green]Copying entry point file...") as status:
@@ -173,7 +187,6 @@ def build(
         shutil.copy("requirements.txt", os.path.join(temp_dir, "requirements.txt"))
         steps.append("Copied requirements.txt file to temporary directory.")
 
-    cache_dir = ".okik/cache/"
     os.makedirs(cache_dir, exist_ok=True)
     image_json_path = os.path.join(cache_dir, "configs.json")
 
@@ -314,8 +327,8 @@ def server(
     log_info("Server stopped.")
 
 
-@typer_app.command(name="gen")
-def gen(
+@typer_app.command()
+def routes(
     entry_point: str = typer.Option(
         "main.py", "--entry-point", "-e", help="Entry point file"
     ),
@@ -349,7 +362,6 @@ def gen(
                     routes_by_base_path[base_path] = Tree(f"[bold cyan]<HOST>/{base_path}/[/bold cyan]")
                     routes_tree.add(routes_by_base_path[base_path])
                 routes_by_base_path[base_path].add(f"[green]{route.path}[/green] | [green]{', '.join(route.methods)}[/green]")
-
         console.print(routes_tree)
     except Exception as e:
         console.print(f"Failed to load the entry point module '[bold red]{entry_point}[/bold red]': {e}", style="bold red")
@@ -364,7 +376,7 @@ def deploy(
     Deploy the application to a cloud or cluster.
     Warning: This is just a mockup
     """
-    services_dir = ".okik/services/okik"
+    services_dir = f'{ProjectDir.SERVICES_DIR.value}/okik'
     yaml_files = [f for f in os.listdir(services_dir) if f.endswith('.yaml') or f.endswith('.yml')]
 
     if not yaml_files:
