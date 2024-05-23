@@ -21,6 +21,7 @@ RUN git clone https://github.com/okikorg/okik.git
 RUN pip install ./okik
 RUN export PATH="$HOME/.local/bin:$PATH"
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN which okik
 RUN okik init
 RUN okik
 
