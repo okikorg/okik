@@ -21,6 +21,7 @@ from okik.consts import ProjectDir
 import json
 from rich.progress import Progress
 from rich.tree import Tree
+from okik.scripts.dockerfiles.dockerfile_gen import create_dockerfile
 
 # Initialize Typer app
 typer_app = typer.Typer()
@@ -69,24 +70,14 @@ def init():
             os.makedirs(folder, exist_ok=True)
             tasks[folders_list.index(folder)]["status"] = "completed"
 
-        # Find the path to the installed okik library
-        okik_spec = importlib.util.find_spec("okik")
-        if okik_spec is None:
+        # Use dockerfile_gen to generate the Dockerfile
+        try:
+            create_dockerfile(docker_dir)
+            tasks[3]["status"] = "completed"
+        except Exception as e:
             tasks[3]["status"] = "failed"
-            console.print("Okik library not found. Please ensure it is installed.", style="bold red")
+            console.print(f"Failed to generate Dockerfile: {str(e)}", style="bold red")
             raise typer.Exit(code=1)
-
-        okik_path = okik_spec.submodule_search_locations[0]
-        dockerfile_source = os.path.join(okik_path, "scripts", "dockerfiles", "Dockerfile")
-
-        if not os.path.isfile(dockerfile_source):
-            tasks[3]["status"] = "failed"
-            console.print(f"Dockerfile not found at {dockerfile_source}", style="bold red")
-            raise typer.Exit(code=1)
-
-        # Destination .okik/docker/Dockerfile
-        shutil.copy(dockerfile_source, f'{docker_dir}/Dockerfile')
-        tasks[3]["status"] = "completed"
 
         # Create okik folder in home directory and add credentials.json with token
         home_dir = os.path.expanduser("~")
