@@ -28,12 +28,10 @@ typer_app = typer.Typer()
 console = Console()
 
 
-
 @typer_app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
     """
-    This function is called whenever the Typer app is invoked without a specific command.
-    It will display the ASCII art and additional text if no sub-command is provided.
+    Okik CLI: Simplify. Deploy. Scale.
     """
     if ctx.invoked_subcommand is None:
         ascii_art = pyfiglet.figlet_format("Okik", font="ansi_regular")
