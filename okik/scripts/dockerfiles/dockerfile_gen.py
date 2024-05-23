@@ -1,3 +1,5 @@
+def create_dockerfile(path, name:str = "Dockerfile"):
+    dockerfile_content = f"""
 # Use an official Python runtime as a parent image
 FROM python:latest
 
@@ -32,3 +34,6 @@ EXPOSE 3000
 
 # Run okik app
 CMD ["okik", "server"]
+    """
+    with open(f"{path}/{name}", 'w') as file:
+        file.write(dockerfile_content)

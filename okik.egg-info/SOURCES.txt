@@ -1,6 +1,7 @@
 README.md
 setup.py
 okik/__init__.py
+okik/consts.py
 okik/endpoints.py
 okik/logger.py
 okik/main.py
@@ -11,6 +12,7 @@ okik.egg-info/entry_points.txt
 okik.egg-info/requires.txt
 okik.egg-info/top_level.txt
 okik/deploy/__init__.py
+okik/scripts/__init__.py
 okik/utils/__init__.py
 okik/utils/configs/__init__.py
 okik/utils/configs/machines.py
