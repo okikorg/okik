@@ -171,7 +171,7 @@ def service(replicas: Optional[int] = 1, resources: Optional[Union[dict, Service
         return cls
     return decorator
 
-def api(func: Callable):
+def endpoint(func: Callable):
     """
     Decorator to mark a function as an API endpoint.
 
@@ -190,4 +190,4 @@ def api(func: Callable):
 
 app.include_router(router)
 
-__all__ = ["service", "api", "app"]
+__all__ = ["service", "endpoint", "app"]

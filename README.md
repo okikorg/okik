@@ -36,7 +36,7 @@ okik init
 Write this in your `main.py` file:
 
 ```python
-from okik.endpoints import service, api, app
+from okik.endpoints import service, endpoint, app
 from sentence_transformers import SentenceTransformer
 import sentence_transformers
 from torch.nn.functional import cosine_similarity as cosine
@@ -44,25 +44,26 @@ import torch
 
 # your service configuration
 @service(
-    replicas=2,
-    resources={"accelerator": {"type": "cuda", "device": "A40", "count": 2}}
+    replicas=1,
+    resources={"accelerator": {"type": "cuda", "device": "A40", "count": 1, "memory": 4}},
+    backend="okik"
 )
-class Embedder: # your service class which will be used to serve the requests
+class Embedder:
     def __init__(self):
         self.model = SentenceTransformer("paraphrase-MiniLM-L6-v2", cache_folder=".okik/cache")
 
-    @api # your api endpoint
+    @endpoint
     def embed(self, sentence: str):
         logits = self.model.encode(sentence)
         return logits
 
-    @api
+    @endpoint
     def similarity(self, sentence1: str, sentence2: str):
         logits1 = self.model.encode(sentence1, convert_to_tensor=True)
         logits2 = self.model.encode(sentence2, convert_to_tensor=True)
         return cosine(logits1.unsqueeze(0), logits2.unsqueeze(0))
 
-    @api
+    @endpoint
     def version(self):
         return sentence_transformers.__version__
 ```
@@ -70,7 +71,7 @@ class Embedder: # your service class which will be used to serve the requests
 ## Verify the routes
 ```bash
 # run the okik routes to check all available routes
-okik gen
+okik routes
 ```
 
 ## Serving the app
