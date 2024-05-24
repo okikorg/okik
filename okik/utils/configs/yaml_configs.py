@@ -6,19 +6,21 @@ import os
 import json
 from okik.consts import ProjectDir
 
-
 def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas: int) -> dict:
     # read image name from .okik/configs/configs.json
     with open(os.path.join(ProjectDir.CONFIG_DIR.value, "configs.json"), "r") as f:
         configs = json.load(f)
         image_name = configs["image_name"]
         app_name = configs["app_name"]
+
     return {
         "apiVersion": "apps/v1",
         "kind": "Deployment",
         "metadata": {
             "name": cls.__name__.lower(),
-            "app_name": f"{app_name}"
+            "labels": {
+                "app_name": f"{app_name}"
+            }
         },
         "spec": {
             "replicas": replicas,
@@ -40,17 +42,17 @@ def generate_k8s_yaml_config(cls: Callable, resources: ServiceConfigs, replicas:
                             "image": f"{image_name}",
                             "resources": {
                                 "limits": {
-                                    "nvidia.com/gpu": resources.accelerator.count,
-                                    "memory": f"{resources.accelerator.memory}Gi"
+                                    "memory": f"{resources.accelerator.memory}Gi",
+                                    **({"nvidia.com/gpu": resources.accelerator.count} if resources.accelerator.type == "cuda" else {})
                                 },
                                 "requests": {
-                                    "nvidia.com/gpu": resources.accelerator.count,
-                                    "memory": f"{resources.accelerator.memory}Gi"
+                                    "memory": f"{resources.accelerator.memory}Gi",
+                                    **({"nvidia.com/gpu": resources.accelerator.count} if resources.accelerator.type == "cuda" else {})
                                 }
                             },
                             "env": [
                                 {
-                                    "name": "NVIDIA_VISIBLE_DEVICES",
+                                    "name": "ACCELERATOR_COUNT",
                                     "value": ",".join(str(i) for i in range(resources.accelerator.count))
                                 }
                             ]

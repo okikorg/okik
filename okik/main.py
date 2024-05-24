@@ -22,12 +22,18 @@ import json
 from rich.progress import Progress
 from rich.tree import Tree
 from okik.scripts.dockerfiles.dockerfile_gen import create_dockerfile
+from kubernetes import client, config, utils
+from kubernetes.client import ApiException
+from rich.prompt import Prompt
+from rich.prompt import Confirm
+from rich.status import Status
 
 # Initialize Typer app
 typer_app = typer.Typer()
 # Initialize Rich console
 console = Console()
 
+KUBE_CONFIG_PATH = os.path.expanduser("~/.kube/config")
 
 @typer_app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
@@ -355,61 +361,267 @@ def routes(
     except Exception as e:
         console.print(f"Failed to load the entry point module '[bold red]{entry_point}[/bold red]': {e}", style="bold red")
 
-@typer_app.command(name="mock-deploy")
+def delete_existing_resources(yaml_documents):
+    apps_v1 = client.AppsV1Api()
+    core_v1 = client.CoreV1Api()
+    autoscaling_v1 = client.AutoscalingV1Api()
+
+    for yaml_doc in yaml_documents:
+        kind = yaml_doc.get('kind')
+        metadata = yaml_doc.get('metadata', {})
+        name = metadata.get('name')
+
+        if not kind or not name:
+            continue
+
+        try:
+            if kind == 'Deployment':
+                apps_v1.delete_namespaced_deployment(name, namespace="default")
+            elif kind == 'Service':
+                core_v1.delete_namespaced_service(name, namespace="default")
+            elif kind == 'HorizontalPodAutoscaler':
+                autoscaling_v1.delete_namespaced_horizontal_pod_autoscaler(name, namespace="default")
+            console.print(f"Deleted existing {kind} '{name}'", style="bold yellow")
+        except ApiException as e:
+            if e.status != 404:
+                console.print(f"Failed to delete existing {kind} '{name}': {e}", style="bold red")
+
+@typer_app.command(name="deploy")
 def deploy(
     entry_point: str = typer.Option(
         "main.py", "--entry-point", "-e", help="Entry point file"
     )
 ):
     """
-    Deploy the application to a cloud or cluster.
-    Warning: This is just a mockup
+    Deploy the application to a Kubernetes cluster.
     """
-    services_dir = f'{ProjectDir.SERVICES_DIR.value}/okik'
+    services_dir = os.path.join(ProjectDir.SERVICES_DIR.value,'k8')  # Adjusted for clarity
     yaml_files = [f for f in os.listdir(services_dir) if f.endswith('.yaml') or f.endswith('.yml')]
 
     if not yaml_files:
         console.print("No YAML configuration files found in the services directory.", style="bold red")
         return
 
-    for yaml_file in yaml_files:
-        yaml_path = os.path.join(services_dir, yaml_file)
+    selected_file = Prompt.ask("Select a YAML file to deploy", choices=yaml_files)
+
+    yaml_path = os.path.join(services_dir, selected_file)
+    try:
         with open(yaml_path, 'r') as file:
-            try:
-                yaml_content = yaml.safe_load(file)
+            yaml_documents = list(yaml.safe_load_all(file))
+            for index, yaml_content in enumerate(yaml_documents):
                 yaml_content_neat = "\n".join([f"{key}: {value}" for key, value in yaml_content.items()])
-                panel = Panel(Text(yaml_content_neat, justify="left"), title=f"YAML Configuration: {yaml_file}", border_style="blue")
+                panel = Panel(Text(yaml_content_neat, justify="left"), title=f"YAML Configuration: {selected_file} (Document {index+1})", border_style="blue")
                 console.print(panel)
-            except yaml.YAMLError as exc:
-                console.print(f"Error parsing YAML file '{yaml_file}': {exc}", style="bold red")
-                continue
+    except yaml.YAMLError as exc:
+        console.print(f"Error parsing YAML file '{selected_file}': {exc}", style="bold red")
+        return
 
-    answer = typer.confirm("Do you want to continue with the deployment?")
-    # Mock deployment process with async sleep
-    if answer:
-        with Progress() as progress:
-            task = progress.add_task("Deploying...", total=100)
-            for i in range(100):
-                progress.update(task, advance=1)
-                time.sleep(0.05)
-        console.print("Deployment completed successfully!", style="bold green")
-
-    if not answer:
-        typer.echo("Deployment stopped by the user.")
+    if not Confirm.ask("Do you want to continue with the deployment?"):
+        console.print("Deployment stopped by the user.", style="bold red")
         raise typer.Exit()
 
-# mock show deployment
-@typer_app.command("mock-show-deployment")
-def show_deployment():
+    # Load Kubernetes configuration
+    try:
+        config.load_kube_config()
+        k8s_client = client.ApiClient()
+        v1 = client.CoreV1Api()
+        console.print("Kubernetes configuration loaded successfully.", style="bold green")
+    except Exception as e:
+        console.print(f"Failed to load Kubernetes configuration: {e}", style="bold red")
+        return
+
+    # Validate credentials
+    credentials_path = os.path.expanduser('~/okik/credentials.json')
+    if not os.path.exists(credentials_path):
+        console.print("Credentials file not found.", style="bold red")
+        return
+
+    # Delete existing resources
+    delete_existing_resources(yaml_documents)
+
+    # Apply the YAML documents
+    console.print("Applying YAML configurations...")
+    try:
+        with Status("Deploying...", spinner="dots") as status:
+            for yaml_doc in yaml_documents:
+                utils.create_from_dict(k8s_client, yaml_doc, namespace="default")
+        console.print(f"Deployment applied successfully from '{selected_file}'", style="bold green")
+    except ApiException as e:
+        console.print(f"Failed to apply YAML file '{selected_file}': {e}", style="bold red")
+        return
+
+    # Wait for deployment to complete
+    console.print("Waiting for deployment to complete...")
+
+    console.print("Deployment completed successfully!", style="bold green")
+
+    # Retrieve and display the endpoint
+    try:
+        services = v1.list_namespaced_service(namespace="default")
+        if not services.items:
+            console.print("No services found in the default namespace.", style="bold red")
+        else:
+            for service in services.items:
+                console.print(f"Service {service.metadata.name} is available at {service.spec.cluster_ip}:{service.spec.ports[0].port}", style="bold blue")
+                if service.metadata.name == 'embedder':
+                    console.print(f"To test the service, you can use the following command if you are using Minikube:")
+                    console.print(f"  minikube service embedder")
+                    console.print(f"Or you can port-forward the service with:")
+                    console.print(f"  kubectl port-forward service/embedder 8080:80")
+    except ApiException as e:
+        console.print(f"Error retrieving services: {e}", style="bold red")
+
+@typer_app.command(name="get")
+def get_resources(resource: str):
     """
-    Show the deployment status of the application.
+    Get deployments or services in the default namespace.
     """
-    with Progress() as progress:
-        task = progress.add_task("Fetching deployment status...", total=100)
-        for i in range(100):
-            progress.update(task, advance=1)
-            time.sleep(0.05)
-    console.print("Deployment status: [bold green]Running[/bold green]")
+    try:
+        # Load Kubernetes configuration
+        config.load_kube_config()
+        console.print("Kubernetes configuration loaded successfully.", style="bold green")
+    except Exception as e:
+        console.print(f"Failed to load Kubernetes configuration: {e}", style="bold red")
+        return
+
+    if resource == "deployments":
+        get_deployments()
+    elif resource == "services":
+        get_services()
+    else:
+        console.print(f"Unsupported resource type: {resource}", style="bold red")
+
+def get_deployments():
+    apps_v1 = client.AppsV1Api()
+    try:
+        deployments = apps_v1.list_namespaced_deployment(namespace="default")
+        if not deployments.items:
+            console.print("No deployments found in the default namespace.", style="bold yellow")
+            return
+
+        table = Table(title="Kubernetes Deployments in Default Namespace")
+        table.add_column("Name", justify="left", style="cyan", no_wrap=True)
+        table.add_column("Replicas", justify="right", style="magenta")
+        table.add_column("Available Replicas", justify="right", style="green")
+
+        for deployment in deployments.items:
+            table.add_row(deployment.metadata.name, str(deployment.spec.replicas), str(deployment.status.available_replicas or 0))
+
+        console.print(table)
+    except client.exceptions.ApiException as e:
+        console.print(f"Error listing deployments: {e}", style="bold red")
+
+def get_services():
+    core_v1 = client.CoreV1Api()
+    try:
+        services = core_v1.list_namespaced_service(namespace="default")
+        if not services.items:
+            console.print("No services found in the default namespace.", style="bold yellow")
+            return
+
+        table = Table(title="Kubernetes Services in Default Namespace")
+        table.add_column("Name", justify="left", style="cyan", no_wrap=True)
+        table.add_column("Type", justify="left", style="magenta")
+        table.add_column("Cluster IP", justify="left", style="green")
+        table.add_column("Ports", justify="left", style="blue")
+
+        for service in services.items:
+            ports = ", ".join([f"{p.port}/{p.protocol}" for p in service.spec.ports])
+            table.add_row(service.metadata.name, service.spec.type, service.spec.cluster_ip, ports)
+
+        console.print(table)
+    except client.exceptions.ApiException as e:
+        console.print(f"Error listing services: {e}", style="bold red")
+
+@typer_app.command(name="delete")
+def delete_resource(resource: str, name: str):
+    """
+    Delete a deployment or service in the default namespace.
+    """
+    try:
+        # Load Kubernetes configuration
+        config.load_kube_config()
+        console.print("Kubernetes configuration loaded successfully.", style="bold green")
+    except Exception as e:
+        console.print(f"Failed to load Kubernetes configuration: {e}", style="bold red")
+        return
+
+    if resource == "deployment":
+        delete_deployment(name)
+    elif resource == "service":
+        delete_service(name)
+    else:
+        console.print(f"Unsupported resource type: {resource}", style="bold red")
+
+def delete_deployment(name: str):
+    apps_v1 = client.AppsV1Api()
+    try:
+        apps_v1.delete_namespaced_deployment(name=name, namespace="default")
+        console.print(f"Deleted deployment '{name}'", style="bold yellow")
+    except client.exceptions.ApiException as e:
+        console.print(f"Failed to delete deployment '{name}': {e}", style="bold red")
+
+def delete_service(name: str):
+    core_v1 = client.CoreV1Api()
+    try:
+        core_v1.delete_namespaced_service(name=name, namespace="default")
+        console.print(f"Deleted service '{name}'", style="bold yellow")
+    except client.exceptions.ApiException as e:
+        console.print(f"Failed to delete service '{name}': {e}", style="bold red")
+
+
+def list_clusters():
+    contexts, current_context = config.list_kube_config_contexts()
+
+    table = Table(title="Kubernetes Clusters Configured")
+    table.add_column("Context Name", justify="left", style="cyan", no_wrap=True)
+    table.add_column("Cluster Name", justify="left", style="magenta")
+    table.add_column("Current", justify="center", style="green")
+
+    for context in contexts:
+        context_name = context['name']
+        cluster_name = context['context']['cluster']
+        is_current = "Yes" if context_name == current_context['name'] else "No"
+        table.add_row(context_name, cluster_name, is_current)
+
+    console.print(table)
+
+def switch_context(context_name: str):
+    with open(KUBE_CONFIG_PATH, 'r') as stream:
+        kubeconfig = yaml.safe_load(stream)
+
+    context_names = [context['name'] for context in kubeconfig['contexts']]
+    if context_name not in context_names:
+        console.print(f"Cluster context '{context_name}' not found.", style="bold red")
+        return
+
+    kubeconfig['current-context'] = context_name
+
+    with open(KUBE_CONFIG_PATH, 'w') as stream:
+        yaml.safe_dump(kubeconfig, stream)
+
+    console.print(f"Switched to cluster context '{context_name}'", style="bold green")
+
+@typer_app.command(name="cluster")
+def cluster(context_name: str = typer.Argument(None, help="Name of the cluster context to switch to")):
+    """
+    List all Kubernetes clusters configured in the kubeconfig file or switch to a specified cluster.
+    """
+    try:
+        # Load kubeconfig
+        config.load_kube_config()
+        console.print("Kubernetes configuration loaded successfully.", style="bold green")
+    except Exception as e:
+        console.print(f"Failed to load Kubernetes configuration: {e}", style="bold red")
+        return
+
+    if context_name:
+        # Switch context
+        switch_context(context_name)
+    else:
+        # List all clusters
+        list_clusters()
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
