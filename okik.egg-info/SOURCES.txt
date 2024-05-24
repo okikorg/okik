@@ -13,6 +13,8 @@ okik.egg-info/requires.txt
 okik.egg-info/top_level.txt
 okik/deploy/__init__.py
 okik/scripts/__init__.py
+okik/scripts/dockerfiles/__init__.py
+okik/scripts/dockerfiles/dockerfile_gen.py
 okik/utils/__init__.py
 okik/utils/configs/__init__.py
 okik/utils/configs/machines.py
