@@ -117,6 +117,11 @@ okik server -d -r
 curl -X POST http://0.0.0.0:3000/embedder/version
 # or if you like to use httpie then
 http POST 0.0.0.0:3000/embedder/version
+
+# or test the stream endpoint
+curl -X POST http://0.0.0.0:3000/mockllm/stream_random_words -d '{"prompt": "Hello"}'
+# or if you like to use httpie then
+http POST 0.0.0.0:3000/mockllm/stream_random_words prompt="hello" --stream
 ```
 
 
