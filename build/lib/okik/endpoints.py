@@ -9,7 +9,7 @@ import yaml
 import numpy as np
 from rich.console import Console
 from pydantic import BaseModel, ValidationError
-from okik.utils.configs.serviceconfigs import ServiceConfigs, AcceleratorConfigs, AcceleratorDevice, AcceleratorType
+from okik.utils.configs.serviceconfigs import ServiceConfigs, AcceleratorConfigs, AcceleratorDevice, AcceleratorDevice
 
 console = Console()
 app = FastAPI()
@@ -66,7 +66,7 @@ def create_yaml_resources(cls, replicas: int, resources: Optional[ServiceConfigs
     def enum_representer(dumper, data):
         return dumper.represent_scalar('tag:yaml.org,2002:str', data.value)
     yaml.add_representer(AcceleratorDevice, enum_representer)
-    yaml.add_representer(AcceleratorType, enum_representer)
+    yaml.add_representer(AcceleratorDevice, enum_representer)
     model_instance = cls()
     os.makedirs(".okik/services", exist_ok=True)
     file_path = f".okik/services/serviceconfig.yaml"

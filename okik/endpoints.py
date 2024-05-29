@@ -9,7 +9,7 @@ import yaml
 import numpy as np
 from rich.console import Console
 from pydantic import BaseModel, ValidationError
-from okik.utils.configs.serviceconfigs import BackendType, ProvisioningBackend, ServiceConfigs, AcceleratorConfigs, AcceleratorDevice, AcceleratorType
+from okik.utils.configs.serviceconfigs import BackendType, ProvisioningBackend, ServiceConfigs, AcceleratorConfigs, AcceleratorType, AcceleratorDevice
 from okik.utils.configs.yaml_configs import generate_k8s_yaml_config, generate_okik_yaml_config
 from okik.logger import log_info, log_error, log_warning, log_debug, log_success, log_start, log_running
 
@@ -77,8 +77,8 @@ def create_yaml_resources(cls, replicas: int, resources: ServiceConfigs, backend
     def enum_representer(dumper, data):
         return dumper.represent_scalar('tag:yaml.org,2002:str', data.value)
 
-    yaml.add_representer(AcceleratorDevice, enum_representer)
     yaml.add_representer(AcceleratorType, enum_representer)
+    yaml.add_representer(AcceleratorDevice, enum_representer)
 
     if backend == "k8":
             k8s_yaml = generate_k8s_yaml_config(cls, resources, replicas)
