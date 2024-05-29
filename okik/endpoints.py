@@ -18,7 +18,6 @@ console = Console()
 app = FastAPI()
 router = APIRouter()
 
-
 def create_route_handlers(cls):
     model_instance = cls()
     class_name = cls.__name__.lower()
@@ -38,7 +37,7 @@ def create_route_handlers(cls):
 
                         # Check if the method is marked for streaming
                         if getattr(method, "is_streaming", False):
-                            return StreamingResponse(result, media_type="text/event-stream")
+                            return StreamingResponse(result)
                         else:
                             return serialize_result(result)
                     except TypeError as e:
@@ -50,14 +49,14 @@ def create_route_handlers(cls):
             router.post(f"/{class_name}/{method_name}", response_model=Union[Dict, List, int, float, str, bool])(unique_endpoint_route)
     app.include_router(router)
 
-
 async def call_method(model_instance, method, kwargs: Dict[str, Any]):
     if asyncio.iscoroutinefunction(method):
         result = await method(**kwargs)
+    elif isinstance(model_instance, nn.Module):
+        result = model_instance(**kwargs)
     else:
         result = method(**kwargs)
     return result
-
 
 def serialize_result(result: Any):
     if isinstance(result, torch.Tensor):
@@ -104,7 +103,7 @@ def create_yaml_resources(cls, replicas: int, resources: ServiceConfigs, backend
         raise ValueError(f"Invalid backend. Must be one of {list(BackendType.__members__.keys())}")
 
     # Load existing data if the file exists
-    if os.path.exists(file_path):
+    if os.path.exists(file_path)):
         with open(file_path, "r") as f:
             try:
                 existing_data = yaml.safe_load(f) or {}
@@ -177,7 +176,7 @@ def service(replicas: Optional[int] = 1, resources: Optional[Union[dict, Service
         return cls
     return decorator
 
-def endpoint(stream: Optional[bool] = False):
+def endpoint(stream: bool = False):
     """
     Decorator to mark a function as an API endpoint, with optional streaming support.
 
