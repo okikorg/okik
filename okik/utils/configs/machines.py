@@ -1,6 +1,6 @@
 from enum import Enum
 
-class AcceleratorDevice(Enum):
+class AcceleratorType(Enum):
     MI300X = "MI300X"
     MI250X = "MI250X"
     A100_80GB = "A100-80GB"
@@ -16,9 +16,9 @@ class AcceleratorDevice(Enum):
     P100 = "P100"
 
 
-class AcceleratorType(Enum):
+class AcceleratorDevice(Enum):
     cuda: str = "cuda"
     cpu: str = "cpu"
 
 
-__all__ = ["AcceleratorDevice", "AcceleratorType"]
+__all__ = ["AcceleratorType", "AcceleratorDevice"]
