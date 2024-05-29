@@ -103,7 +103,7 @@ def create_yaml_resources(cls, replicas: int, resources: ServiceConfigs, backend
         raise ValueError(f"Invalid backend. Must be one of {list(BackendType.__members__.keys())}")
 
     # Load existing data if the file exists
-    if os.path.exists(file_path)):
+    if os.path.exists(file_path):
         with open(file_path, "r") as f:
             try:
                 existing_data = yaml.safe_load(f) or {}
