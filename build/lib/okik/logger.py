@@ -17,7 +17,7 @@ logger.propagate = (
 )
 
 # Define our handlers
-rich_handler = RichHandler(console=console, markup=True)
+rich_handler = RichHandler(console=console, markup=True, rich_tracebacks=True)
 file_handler = RotatingFileHandler(
     ".okik.log", maxBytes=1024 * 1024 * 10, backupCount=10  # 10 MB
 )

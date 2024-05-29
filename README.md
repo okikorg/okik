@@ -37,35 +37,63 @@ Write this in your `main.py` file:
 
 ```python
 from okik.endpoints import service, endpoint, app
+import asyncio
+from typing import Any
 from sentence_transformers import SentenceTransformer
 import sentence_transformers
 from torch.nn.functional import cosine_similarity as cosine
 import torch
+import random
 
 # your service configuration
 @service(
     replicas=1,
-    resources={"accelerator": {"type": "cuda", "device": "A40", "count": 1, "memory": 4}},
-    backend="okik"
+    resources={"accelerator": {"type": "A40", "device": "cuda", "count": 1, "memory": 4}},
+    backend="okik" # <- provisioning backend is okik
 )
 class Embedder:
     def __init__(self):
         self.model = SentenceTransformer("paraphrase-MiniLM-L6-v2", cache_folder=".okik/cache")
 
-    @endpoint
+    @endpoint()
     def embed(self, sentence: str):
         logits = self.model.encode(sentence)
         return logits
 
-    @endpoint
+    @endpoint()
     def similarity(self, sentence1: str, sentence2: str):
         logits1 = self.model.encode(sentence1, convert_to_tensor=True)
         logits2 = self.model.encode(sentence2, convert_to_tensor=True)
         return cosine(logits1.unsqueeze(0), logits2.unsqueeze(0))
 
-    @endpoint
+    @endpoint()
     def version(self):
         return sentence_transformers.__version__
+
+    @endpoint(stream=True)
+    async def stream_data(self) -> Any:
+        async def data_generator():
+            for i in range(10):
+                yield f"data: {i}\n"
+                await asyncio.sleep(1)
+        return data_generator()
+
+# Mock LLM Service Example
+@service(replicas=1)
+class MockLLM:
+    def __init__(self):
+        pass
+
+    @endpoint(stream=True) # <- streaming response enabled for use cases like chatbot
+    async def stream_random_words(self, prompt: str = "Hello"):
+        async def word_generator():
+            words = ["hello", "world", "fastapi", "stream", "test", "random", "words", "python", "async", "response"]
+            for _ in range(10):
+                word = random.choice(words)
+                yield f"{word}\n"
+                await asyncio.sleep(0.4)
+        return word_generator()
+
 ```
 
 ## Verify the routes

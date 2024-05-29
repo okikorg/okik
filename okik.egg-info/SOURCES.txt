@@ -11,7 +11,6 @@ okik.egg-info/dependency_links.txt
 okik.egg-info/entry_points.txt
 okik.egg-info/requires.txt
 okik.egg-info/top_level.txt
-okik/deploy/__init__.py
 okik/scripts/__init__.py
 okik/scripts/dockerfiles/__init__.py
 okik/scripts/dockerfiles/dockerfile_gen.py
