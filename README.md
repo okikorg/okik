@@ -136,11 +136,27 @@ http POST 0.0.0.0:3000/mockllm/stream_random_words prompt="hello" --stream
 okik build -a "your_awesome_app" -t latest
 ```
 
-## Status
+## Deploy the app
+```bash
+okik deploy
+```
 
+## Monitor the app
+```bash
+# similar to kubectl commands, infact you can use kubectl commands as well
+okik get deployments # for deployments
+okik get services # for services
+```
+
+## Delete the app
+```bash
+okik delete deployment "your_awesome_app"
+```
+
+## Status
 Okik is currently in development so expect sharp edges and bugs. Feel free to contribute to the project by submitting a pull request.
 
 ## Roadmap
 
-- [x] Add support for various inference engines such as vLLM, TGI, etc.
-- [x] Add support for various cloud providers such as AWS, GCP, Azure, etc.
+- [] Add support for various inference engines such as vLLM, TGI, etc.
+- [] Add support for various cloud providers such as AWS, GCP, Azure, etc.
