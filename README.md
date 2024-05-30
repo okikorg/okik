@@ -107,6 +107,19 @@ class MockLLM:
 # run the okik routes to check all available routes
 okik routes
 ```
+```bash
+# output should be similar to this
+main.py Application Routes
+├── <HOST>/health/
+│   └── /health | GET
+├── <HOST>/embedder/
+│   ├── /embedder/embed | POST
+│   ├── /embedder/similarity | POST
+│   ├── /embedder/stream_data | POST
+│   └── /embedder/version | POST
+└── <HOST>/mockllm/
+    └── /mockllm/stream_random_words | POST
+```
 
 ## Serving the app
 ```bash
