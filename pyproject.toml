@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "okik"
-version = "0.0.3"
+version = "0.0.31"
 description = "A Python package to serve python functions, classes, or .py files on a local server or cloud-based environment."
 authors = ["Okik <akash@okik.co.uk>"]
 homepage = "https://www.okik.co.uk/"
