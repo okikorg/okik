@@ -1,11 +1,43 @@
 [tool.poetry]
 name = "okik"
 version = "0.0.3"
-description = "A CLI tool to deploy LLMs, RAGs and other models to any cloud"
-authors = ["Akash Swamy"]
+description = "A Python package to serve python functions, classes, or .py files on a local server or cloud-based environment."
+authors = ["Okik <akash@okik.co.uk>"]
+readme = "README.md"
+packages = [{ include = "okik" }]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11"
+annotated-types = "*"
+anyio = "*"
+art = "*"
+click = "*"
+fastapi = "*"
+filelock = "*"
+fsspec = "*"
+idna = "*"
+Jinja2 = "*"
+markdown-it-py = "*"
+MarkupSafe = "*"
+mdurl = "*"
+mpmath = "*"
+pydantic = ">=2.0.0"
+pydantic_core = "*"
+pyfiglet = "*"
+Pygments = "*"
+PyYAML = "*"
+rich = "*"
+shellingham = "*"
+sniffio = "*"
+starlette = "*"
+sympy = "*"
+networkx = "*"
+torch = "*"
+typer = "*"
+typing_extensions = "*"
+numpy = "*"
+httpie = "*"
+kubernetes = "*"
 
 [tool.poetry.scripts]
 okik = "okik.main:typer_app"
