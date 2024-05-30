@@ -8,7 +8,7 @@ authors = ["Akash Swamy"]
 python = "^3.12"
 
 [tool.poetry.scripts]
-okik = "okik.cli:main"
+okik = "okik.main:typer_app"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
