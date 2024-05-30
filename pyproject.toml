@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "okik"
-version = "0.1.0"
+version = "0.0.3"
 description = "A CLI tool to deploy LLMs, RAGs and other models to any cloud"
 authors = ["Akash Swamy"]
 
