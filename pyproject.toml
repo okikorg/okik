@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "okik"
+version = "0.1.0"
+description = "A CLI tool to deploy LLMs, RAGs and other models to any cloud"
+authors = ["Your Name akash@okik.co.uk"]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+[tool.poetry.scripts]
+okik = "okik.cli:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

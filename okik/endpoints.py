@@ -24,10 +24,6 @@ added_routes = set()
 async def health_check():
     return {"status": "ok"}
 
-@app.get("/version")
-async def version():
-    return {"version": "0.1.0"}
-
 def create_route_handlers(cls):
     model_instance = cls()
     class_name = cls.__name__.lower()
