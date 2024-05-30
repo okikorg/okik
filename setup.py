@@ -24,3 +24,5 @@ setup(
         "Programming Language :: Python :: 3.11",
     ],
 )
+
+__all__ = ["__version__"]

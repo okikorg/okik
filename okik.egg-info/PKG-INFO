@@ -35,3 +35,4 @@ Requires-Dist: typer
 Requires-Dist: typing_extensions
 Requires-Dist: numpy
 Requires-Dist: httpie
+Requires-Dist: kubernetes
