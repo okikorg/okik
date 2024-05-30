@@ -3,6 +3,7 @@ name = "okik"
 version = "0.0.3"
 description = "A Python package to serve python functions, classes, or .py files on a local server or cloud-based environment."
 authors = ["Okik <akash@okik.co.uk>"]
+homepage = "https://www.okik.co.uk/"
 readme = "README.md"
 packages = [{ include = "okik" }]
 

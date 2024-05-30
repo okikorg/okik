@@ -3,7 +3,13 @@
 *Okik* is a command-line interface (CLI) that allows users to run various inference services such as LLM, RAG(WIP), or anything in between using various frameworks on any *cloud. With *Okik*, you can easily run these services directly on any cloud without the hassle of managing your own infra.
 
 ## Installation
+Using pip
 
+```bash
+pip install okik
+```
+
+Or
 To install Okik, follow these steps:
 
 1. Clone the repository: `git clone https://github.com/okikorg/okik.git`
@@ -133,3 +139,8 @@ okik build -a "your_awesome_app" -t latest
 ## Status
 
 Okik is currently in development so expect sharp edges and bugs. Feel free to contribute to the project by submitting a pull request.
+
+## Roadmap
+
+- [x] Add support for various inference engines such as vLLM, TGI, etc.
+- [x] Add support for various cloud providers such as AWS, GCP, Azure, etc.
