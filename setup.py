@@ -21,7 +21,8 @@ setup(
     },
     install_requires=['fastapi', required],
     classifiers=[
-        "Programming Language :: Python :: 3.11",
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
     ],
 )
 
