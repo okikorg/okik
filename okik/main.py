@@ -214,7 +214,7 @@ def build(
             steps.append(f"Prefixed app name: {app_name}")
             docker_image_name = f"{cloud_prefix}/{registry_id}/{app_name}:{tag}"
         else:
-            docker_image_name = f"cr.ai.nebius.cloud/{registry_id}/{app_name}:{tag}"
+            docker_image_name = f"okik.cloud/{registry_id}/{app_name}:{tag}"
         steps.append(f"Formatted Docker image name: {docker_image_name}")
 
         # Preserve image name in JSON file
