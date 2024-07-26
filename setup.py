@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-__version__ = "0.0.2"
+__version__ = "0.0.34"
 
 # Read requirements.txt and store contents in a list
 with open("./requirements.txt") as f:

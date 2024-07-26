@@ -153,6 +153,7 @@ def build(
         "Verbose": verbose,
         "Force Build": force_build
     }
+
     arguments_text = "\n".join([f"{key}: {value}" for key, value in arguments.items()])
     console.print(arguments_text, style="bold blue")
 
@@ -185,9 +186,11 @@ def build(
     os.makedirs(config_dir, exist_ok=True)
     image_json_path = os.path.join(config_dir, "configs.json")
 
-    if force_build and os.path.exists(image_json_path):
-        os.remove(image_json_path)
-        console.print("Existing image name cleared due to force build.", style="bold red")
+    if force_build:
+        if os.path.exists(image_json_path):
+            os.remove(image_json_path)
+            console.print("Existing image configuration cleared due to force build.", style="bold yellow")
+        steps.append("Force build option applied.")
 
     existing_app_name = None
     if os.path.exists(image_json_path):
@@ -196,11 +199,11 @@ def build(
                 json_content = json.load(json_file)
                 existing_app_name = json_content.get("image_name")
                 if existing_app_name:
-                    console.print(f"Warning: Existing Docker image '{existing_app_name}' will be overwritten.", style="bold red")
+                    console.print(f"Using existing Docker image name: '{existing_app_name}'", style="bold blue")
             except json.JSONDecodeError as e:
                 log_error(f"Error reading JSON file: {e}")
 
-    if existing_app_name:
+    if existing_app_name and not force_build:
         docker_image_name = existing_app_name
         steps.append(f"Using existing app name from JSON: {docker_image_name}")
     else:
@@ -219,7 +222,8 @@ def build(
             json.dump({"image_name": docker_image_name, "app_name": app_name}, json_file)
         steps.append("Preserved image name in JSON file.")
 
-    build_command = f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
+    build_command = f"docker build --no-cache -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}" if force_build else f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
+    build_success = False
     with console.status("[bold green]Building Docker image...") as status:
         if verbose:
             process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -233,11 +237,81 @@ def build(
             stderr_output = process.stderr.readlines()
             for error in stderr_output:
                 console.print(error.strip(), style="bold red")
+            build_success = process.returncode == 0
         else:
             result = subprocess.run(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if result.returncode != 0:
                 console.print(result.stderr, style="bold red")
-        steps.append(f"Built Docker image '{docker_image_name}'.")
+            build_success = result.returncode == 0
+
+        if build_success:
+            steps.append(f"Built Docker image '{docker_image_name}'.")
+        else:
+            steps.append(f"Failed to build Docker image '{docker_image_name}'.")
+
+    # os.makedirs(config_dir, exist_ok=True)
+    # image_json_path = os.path.join(config_dir, "configs.json")
+
+    # if force_build and os.path.exists(image_json_path):
+    #     os.remove(image_json_path)
+    #     console.print("Existing image name cleared due to force build.", style="bold red")
+
+    # existing_app_name = None
+    # if os.path.exists(image_json_path):
+    #     with open(image_json_path, "r") as json_file:
+    #         try:
+    #             json_content = json.load(json_file)
+    #             existing_app_name = json_content.get("image_name")
+    #             if existing_app_name:
+    #                 console.print(f"Warning: Existing Docker image '{existing_app_name}' will be overwritten.", style="bold red")
+    #         except json.JSONDecodeError as e:
+    #             log_error(f"Error reading JSON file: {e}")
+
+    # if existing_app_name:
+    #     docker_image_name = existing_app_name
+    #     steps.append(f"Using existing app name from JSON: {docker_image_name}")
+    # else:
+    #     if not app_name:
+    #         app_name = f"app-{uuid.uuid4()}"
+    #         steps.append(f"Generated unique app name: {app_name}")
+    #     if cloud_prefix:
+    #         steps.append(f"Prefixed app name: {app_name}")
+    #         docker_image_name = f"{cloud_prefix}/{registry_id}/{app_name}:{tag}"
+    #     else:
+    #         docker_image_name = f"cr.ai.nebius.cloud/{registry_id}/{app_name}:{tag}"
+    #     steps.append(f"Formatted Docker image name: {docker_image_name}")
+
+    #     # Preserve image name in JSON file
+    #     with open(image_json_path, "w") as json_file:
+    #         json.dump({"image_name": docker_image_name, "app_name": app_name}, json_file)
+    #     steps.append("Preserved image name in JSON file.")
+
+    # build_command = f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
+    # build_success = False
+    # with console.status("[bold green]Building Docker image...") as status:
+    #     if verbose:
+    #         process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    #         while True:
+    #             output = process.stdout.readline()
+    #             if not output and process.poll() is not None:
+    #                 break
+    #             if output:
+    #                 console.print(output.strip())
+    #         # Read any remaining output from stderr (error stream)
+    #         stderr_output = process.stderr.readlines()
+    #         for error in stderr_output:
+    #             console.print(error.strip(), style="bold red")
+    #         build_success = process.returncode == 0
+    #     else:
+    #         result = subprocess.run(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    #         if result.returncode != 0:
+    #             console.print(result.stderr, style="bold red")
+    #         build_success = result.returncode == 0
+
+    #     if build_success:
+    #         steps.append(f"Built Docker image '{docker_image_name}'.")
+    #     else:
+    #         steps.append(f"Failed to build Docker image '{docker_image_name}'.")
 
     with console.status("[bold green]Cleaning up temporary directory...") as status:
         shutil.rmtree(temp_dir)
@@ -245,15 +319,20 @@ def build(
 
     end_time = time.time()
     elapsed_time = end_time - start_time
-    steps.append(f"Docker image '{docker_image_name}' built successfully in {elapsed_time:.2f} seconds.")
-    log_success(f"Docker image '{docker_image_name}' built successfully in {elapsed_time:.2f} seconds.")
+
+    if build_success:
+        steps.append(f"Docker image '{docker_image_name}' built successfully in {elapsed_time:.2f} seconds.")
+        log_success(f"Docker image '{docker_image_name}' built successfully in {elapsed_time:.2f} seconds.")
+    else:
+        steps.append(f"Docker image build failed after {elapsed_time:.2f} seconds.")
+        log_error(f"Docker image '{docker_image_name}' build failed after {elapsed_time:.2f} seconds.")
 
     # Prompt the user to build the image with more details with --verbose flag
     steps.append("Build the image with more details using the --verbose flag if you want to see more details.")
 
     # Display all steps
     for step in steps:
-        console.print(step, style="bold green")
+        console.print(step, style="bold green" if build_success else "bold red")
 
 @typer_app.command()
 def server(
