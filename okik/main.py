@@ -1,34 +1,37 @@
+import asyncio
+import importlib
+import json
 import os
-import time
-import pyfiglet
 import shutil
-from torch import backends
-import typer
-from art import text2art
 import subprocess
 import sys
-import yaml
-import asyncio
+import time
 import uuid
-import importlib
-from fastapi.routing import APIRoute
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.text import Text
-from okik.logger import log_error, log_running, log_start, log_success, log_info
-from okik.consts import ProjectDir
-import json
+import yaml
+
+import pyfiglet
 import questionary
-from rich.progress import Progress
-from rich.tree import Tree
-from rich.syntax import Syntax
-from okik.scripts.dockerfiles.dockerfile_gen import create_dockerfile
+import typer
+from art import text2art
+from fastapi.routing import APIRoute
 from kubernetes import client, config, utils
 from kubernetes.client import ApiException
-from rich.prompt import Prompt
-from rich.prompt import Confirm
+from okik.consts import ProjectDir
+from okik.logger import log_error, log_info, log_running, log_start, log_success
+from okik.scripts.dockerfiles.dockerfile_gen import create_dockerfile
+from rich import box
+from rich.console import Console, Group
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import Progress
+from rich.prompt import Confirm, Prompt
 from rich.status import Status
+from rich.spinner import Spinner
+from rich.syntax import Syntax
+from rich.table import Table
+from rich.text import Text
+from rich.tree import Tree
+from torch import backends
 
 # Initialize Typer app
 typer_app = typer.Typer()
@@ -226,25 +229,76 @@ def build(
 
     build_command = f"docker build --no-cache -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}" if force_build else f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
     build_success = False
-    with console.status("[bold green]Building Docker image...") as status:
-        if verbose:
-            process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            while True:
-                output = process.stdout.readline()
-                if not output and process.poll() is not None:
-                    break
-                if output:
-                    console.print(output.strip())
-            # Read any remaining output from stderr (error stream)
-            stderr_output = process.stderr.readlines()
-            for error in stderr_output:
-                console.print(error.strip(), style="bold red")
-            build_success = process.returncode == 0
-        else:
-            result = subprocess.run(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if result.returncode != 0:
-                console.print(result.stderr, style="bold red")
-            build_success = result.returncode == 0
+
+    log_lines = []
+    max_lines = 5  # Adjust this value to show more or fewer lines
+    spinner = Spinner("dots", text="Building Docker image")
+
+    def get_output():
+        return Group(
+            spinner,
+            *[Text(line, style="dim") for line in log_lines[-max_lines:]]
+        )
+
+    with Live(get_output(), refresh_per_second=10) as live:
+        process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+
+        for line in iter(process.stdout.readline, ''):
+            line = line.strip()
+            if line.startswith("Step "):
+                spinner.text = line
+                log_lines.append(line)
+                steps.append(line)
+            elif verbose:
+                log_lines.append(line)
+            elif "-->" in line:
+                log_lines.append(line)
+
+            live.update(get_output())
+
+        process.stdout.close()
+        return_code = process.wait()
+        build_success = return_code == 0
+
+
+    # with console.status("[bold green]Building Docker image...") as status:
+    #     process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+
+    #     current_step = ""
+    #     for line in iter(process.stdout.readline, ''):
+    #         line = line.strip()
+    #         if line.startswith("Step "):
+    #             current_step = line
+    #             status.update(f"[bold green]{current_step}")
+    #         elif verbose:
+    #             console.print(line)
+
+    #         if "Step" in line:
+    #             steps.append(line)
+
+    #     process.stdout.close()
+    #     return_code = process.wait()
+    #     build_success = return_code == 0
+
+    # with console.status("[bold green]Building Docker image...") as status:
+    #     if verbose:
+    #         process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    #         while True:
+    #             output = process.stdout.readline()
+    #             if not output and process.poll() is not None:
+    #                 break
+    #             if output:
+    #                 console.print(output.strip())
+    #         # Read any remaining output from stderr (error stream)
+    #         stderr_output = process.stderr.readlines()
+    #         for error in stderr_output:
+    #             console.print(error.strip(), style="bold red")
+    #         build_success = process.returncode == 0
+    #     else:
+    #         result = subprocess.run(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    #         if result.returncode != 0:
+    #             console.print(result.stderr, style="bold red")
+    #         build_success = result.returncode == 0
 
         if build_success:
             steps.append(f"Built Docker image '{docker_image_name}'.")
