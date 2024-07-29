@@ -19,8 +19,10 @@ from rich.text import Text
 from okik.logger import log_error, log_running, log_start, log_success, log_info
 from okik.consts import ProjectDir
 import json
+import questionary
 from rich.progress import Progress
 from rich.tree import Tree
+from rich.syntax import Syntax
 from okik.scripts.dockerfiles.dockerfile_gen import create_dockerfile
 from kubernetes import client, config, utils
 from kubernetes.client import ApiException
@@ -410,30 +412,53 @@ def deploy(
     """
     Deploy the application to a Kubernetes cluster.
     """
-    services_dir = os.path.join(ProjectDir.SERVICES_DIR.value,'k8')  # Adjusted for clarity
+    services_dir = os.path.join(ProjectDir.SERVICES_DIR.value, 'k8')  # Adjusted for clarity
     yaml_files = [f for f in os.listdir(services_dir) if f.endswith('.yaml') or f.endswith('.yml')]
-
     if not yaml_files:
         console.print("No YAML configuration files found in the services directory.", style="bold red")
         return
 
-    selected_file = Prompt.ask("Select a YAML file to deploy", choices=yaml_files)
+    # Use Select for file selection with highlighting
+    selected_file = questionary.select(
+            "Select a YAML file to deploy:",
+            choices=yaml_files,
+            use_indicator=True,
+            use_arrow_keys=True,
+            style=questionary.Style([
+                ('selected', 'fg:cyan'),
+                ('pointer', 'fg:cyan'),
+            ])
+        ).ask()
+
+    if not selected_file:
+        console.print("No file selected. Deployment cancelled.", style="bold red")
+        return
 
     yaml_path = os.path.join(services_dir, selected_file)
     try:
         with open(yaml_path, 'r') as file:
             yaml_documents = list(yaml.safe_load_all(file))
             for index, yaml_content in enumerate(yaml_documents):
-                yaml_content_neat = "\n".join([f"{key}: {value}" for key, value in yaml_content.items()])
-                panel = Panel(Text(yaml_content_neat, justify="left"), title=f"YAML Configuration: {selected_file} (Document {index+1})", border_style="blue")
+                # Convert YAML content to a formatted string
+                yaml_str = yaml.dump(yaml_content, default_flow_style=False)
+                # Create a Syntax object for syntax highlighting
+                # yaml_syntax = Syntax(yaml_str, "yaml", theme="monokai", line_numbers=True)
+                yaml_syntax = Syntax(yaml_str, "yaml", theme="monokai", background_color="default")
+                panel = Panel(yaml_syntax, title=f"YAML Configuration: {selected_file} (Document {index+1})", border_style="blue")
                 console.print(panel)
     except yaml.YAMLError as exc:
         console.print(f"Error parsing YAML file '{selected_file}': {exc}", style="bold red")
         return
 
-    if not Confirm.ask("Do you want to continue with the deployment?"):
-        console.print("Deployment stopped by the user.", style="bold red")
-        raise typer.Exit()
+    if not questionary.confirm(
+            "Do you want to continue with the deployment?",
+            style=questionary.Style([
+                ('selected', 'fg:cyan'),
+                ('pointer', 'fg:cyan'),
+            ])
+        ).ask():
+            console.print("Deployment stopped by the user.", style="bold red")
+            raise typer.Exit()
 
     # Load Kubernetes configuration
     try:
@@ -467,7 +492,6 @@ def deploy(
 
     # Wait for deployment to complete
     console.print("Waiting for deployment to complete...")
-
     console.print("Deployment completed successfully!", style="bold green")
 
     # Retrieve and display the endpoint

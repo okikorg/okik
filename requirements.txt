@@ -28,3 +28,4 @@ typing_extensions
 numpy
 httpie
 kubernetes
+questionary
