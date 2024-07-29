@@ -1,0 +1,48 @@
+[tool.poetry]
+name = "okik"
+version = "0.0.34"
+description = "A Python package to serve python functions, classes, or .py files on a local server or cloud-based environment."
+authors = ["Okik <akash@okik.co.uk>"]
+homepage = "https://www.okik.co.uk/"
+readme = "README.md"
+packages = [{ include = "okik" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+annotated-types = "*"
+anyio = "*"
+art = "*"
+click = "*"
+fastapi = "*"
+filelock = "*"
+fsspec = "*"
+idna = "*"
+Jinja2 = "*"
+markdown-it-py = "*"
+MarkupSafe = "*"
+mdurl = "*"
+mpmath = "*"
+pydantic = ">=2.0.0"
+pydantic_core = "*"
+pyfiglet = "*"
+Pygments = "*"
+PyYAML = "*"
+rich = "*"
+shellingham = "*"
+sniffio = "*"
+starlette = "*"
+sympy = "*"
+networkx = "*"
+torch = "*"
+typer = "*"
+typing_extensions = "*"
+numpy = "*"
+httpie = "*"
+kubernetes = "*"
+
+[tool.poetry.scripts]
+okik = "okik.main:typer_app"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

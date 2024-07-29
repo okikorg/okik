@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-__version__ = "0.0.2"
+__version__ = "0.0.34"
 
 # Read requirements.txt and store contents in a list
 with open("./requirements.txt") as f:
@@ -21,6 +21,9 @@ setup(
     },
     install_requires=['fastapi', required],
     classifiers=[
-        "Programming Language :: Python :: 3.11",
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
     ],
 )
+
+__all__ = ["__version__"]

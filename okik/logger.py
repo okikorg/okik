@@ -30,7 +30,6 @@ file_handler.setFormatter(logging.Formatter(LOGFORMAT))
 logger.addHandler(rich_handler)
 logger.addHandler(file_handler)
 
-
 # Logging functions
 def log_start(message: str):
     logger.info(f"[bold green]Starting: {message}[/bold green]")
