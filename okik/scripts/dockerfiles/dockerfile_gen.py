@@ -37,7 +37,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 3000
 
 # Run okik app
-CMD ["okik", "server"]
+CMD ["okik", "server", "-r", "-d"]
     """
     with open(f"{path}/{name}", 'w') as file:
         file.write(dockerfile_content)
