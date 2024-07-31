@@ -20,7 +20,7 @@ RUN python3 -m venv venv
 RUN . venv/bin/activate
 # install okik
 RUN echo "Installing okik"
-RUN pip install okik
+RUN pip install -U okik
 # install okik cli
 RUN echo "Installing okik cli"
 RUN export PATH="$HOME/.local/bin:$PATH"
