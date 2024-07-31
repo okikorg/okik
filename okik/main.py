@@ -260,46 +260,6 @@ def build(
         return_code = process.wait()
         build_success = return_code == 0
 
-
-    # with console.status("[bold green]Building Docker image...") as status:
-    #     process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
-
-    #     current_step = ""
-    #     for line in iter(process.stdout.readline, ''):
-    #         line = line.strip()
-    #         if line.startswith("Step "):
-    #             current_step = line
-    #             status.update(f"[bold green]{current_step}")
-    #         elif verbose:
-    #             console.print(line)
-
-    #         if "Step" in line:
-    #             steps.append(line)
-
-    #     process.stdout.close()
-    #     return_code = process.wait()
-    #     build_success = return_code == 0
-
-    # with console.status("[bold green]Building Docker image...") as status:
-    #     if verbose:
-    #         process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    #         while True:
-    #             output = process.stdout.readline()
-    #             if not output and process.poll() is not None:
-    #                 break
-    #             if output:
-    #                 console.print(output.strip())
-    #         # Read any remaining output from stderr (error stream)
-    #         stderr_output = process.stderr.readlines()
-    #         for error in stderr_output:
-    #             console.print(error.strip(), style="bold red")
-    #         build_success = process.returncode == 0
-    #     else:
-    #         result = subprocess.run(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    #         if result.returncode != 0:
-    #             console.print(result.stderr, style="bold red")
-    #         build_success = result.returncode == 0
-
         if build_success:
             steps.append(f"Built Docker image '{docker_image_name}'.")
         else:

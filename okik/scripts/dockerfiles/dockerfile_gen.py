@@ -28,7 +28,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 # verify installation
 RUN echo "Verifying installation"
 RUN which okik
-RUN echo "Initialising okik"
+# initialise okik
 RUN okik init
 
 # Upgrade pip and install any needed packages specified in requirements.txt
