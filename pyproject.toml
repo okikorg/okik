@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "okik"
-version = "0.0.34"
+version = "0.0.341"
 description = "A Python package to serve python functions, classes, or .py files on a local server or cloud-based environment."
 authors = ["Okik <akash@okik.co.uk>"]
 homepage = "https://www.okik.co.uk/"
@@ -39,6 +39,7 @@ typing_extensions = "*"
 numpy = "*"
 httpie = "*"
 kubernetes = "*"
+questionary = "^2.0.1"
 
 [tool.poetry.scripts]
 okik = "okik.main:typer_app"
