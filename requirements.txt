@@ -29,3 +29,4 @@ numpy
 httpie
 kubernetes
 questionary
+uvicorn

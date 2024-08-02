@@ -32,6 +32,11 @@ from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 from torch import backends
+import uvicorn
+import multiprocessing
+import importlib.util
+import traceback
+
 
 # Initialize Typer app
 typer_app = typer.Typer()
@@ -286,6 +291,72 @@ def build(
     for step in steps:
         console.print(step, style="bold green" if build_success else "bold red")
 
+# @typer_app.command()
+# def server(
+#     entry_point: str = typer.Option(
+#         "main.py", "--entry-point", "-e", help="Entry point file"
+#     ),
+#     reload: bool = typer.Option(
+#         False, "--reload", "-r", help="Enable auto-reload for the server"
+#     ),
+#     host: str = typer.Option(
+#         "0.0.0.0", "--host", "-h", help="Host address for the server"
+#     ),
+#     port: int = typer.Option(3000, "--port", "-p", help="Port for the server"),
+#     dev: bool = typer.Option(False, "--dev", "-d", help="Run in development mode"),
+# ):
+#     """
+#     Serve the app in development or production mode.
+#     """
+#     if dev:
+#         console.print(Panel(f"Serving the application with entry point: [bold]{entry_point}[/bold]", title="Okik CLI - Development mode"), style="bold yellow")
+#     else:
+#         console.print(Panel(f"Serving the application with entry point: [bold]{entry_point}[/bold]", title="Okik CLI - Production mode", style="bold green"))
+
+#     # Check if the entry point file exists
+#     if not os.path.isfile(entry_point):
+#         log_error(f"Entry point file '{entry_point}' not found.")
+#         return
+
+#     # Check if the user is importing the 'app' object in their code
+#     with open(entry_point, "r") as file:
+#         code = file.read()
+#         if "from okik import app" in code or "import okik.app" in code:
+#             log_error("Importing 'app' in the entry point file is not allowed.")
+#             return
+
+#     # Prepare the uvicorn command
+#     module_name = os.path.splitext(entry_point)[0]
+#     reload_command = "--reload" if reload and dev else ""
+#     command = f"uvicorn {module_name}:app --host {host} --port {port} {reload_command}"
+
+#     # Adjust command for production if not in dev mode
+#     if not dev:
+#         command += " --workers 4"
+
+#     # Execute the command and allow output to go directly to the console
+#     try:
+#         process = subprocess.Popen(
+#             command, shell=True
+#         )
+
+#         console.print(Panel(
+#                             f"Host: [bold]{host}[/bold]\nPort: [bold]{port}[/bold]\nAuto-reload: [bold]{'Enabled' if reload and dev else 'Disabled'}[/bold]\nEnvironment: [bold]{'Development' if dev else 'Production'}[/bold]\nListening to: [bold]http://{host}:{port}[/bold]", title="Server Details", subtitle=f"Open http://{host}:{port}/docs to view API documentation"
+#                             , style="bold yellow" if dev else "bold green")
+#                         )
+#         log_start("Server running. Press CTRL+C to stop.")
+#         log_info(f"Server listening to http://{host}:{port}")
+#         stdout, stderr = process.communicate()
+#     except Exception as e:
+#         log_error(f"Failed to start the server: {str(e)}")
+#         return
+
+#     if process.returncode != 0:
+#         log_error("Server stopped with errors.")
+#         log_error(stderr.decode() if stderr else "No error details available.")
+
+#     log_info("Server stopped.")
+
 @typer_app.command()
 def server(
     entry_point: str = typer.Option(
@@ -299,6 +370,7 @@ def server(
     ),
     port: int = typer.Option(3000, "--port", "-p", help="Port for the server"),
     dev: bool = typer.Option(False, "--dev", "-d", help="Run in development mode"),
+    log_level: str = typer.Option("info", "--log-level", "-l", help="Log level"),
 ):
     """
     Serve the app in development or production mode.
@@ -306,51 +378,76 @@ def server(
     if dev:
         console.print(Panel(f"Serving the application with entry point: [bold]{entry_point}[/bold]", title="Okik CLI - Development mode"), style="bold yellow")
     else:
-        console.print(Panel(f"Serving the application with entry point: [bold]{entry_point}[/bold]", title="Okik CLI - Production mode", style="bold green"))
+        console.print(Panel(f"Serving the application with entry point: [bold]{entry_point}[/bold]", title="Okik CLI - Production mode"), style="bold green")
 
     # Check if the entry point file exists
     if not os.path.isfile(entry_point):
         log_error(f"Entry point file '{entry_point}' not found.")
         return
 
-    # Check if the user is importing the 'app' object in their code
-    with open(entry_point, "r") as file:
-        code = file.read()
-        if "from okik import app" in code or "import okik.app" in code:
-            log_error("Importing 'app' in the entry point file is not allowed.")
-            return
+    # Add the current directory to sys.path
+    sys.path.insert(0, os.getcwd())
 
-    # Prepare the uvicorn command
-    module_name = os.path.splitext(entry_point)[0]
-    reload_command = "--reload" if reload and dev else ""
-    command = f"uvicorn {module_name}:app --host {host} --port {port} {reload_command}"
-
-    # Adjust command for production if not in dev mode
-    if not dev:
-        command += " --workers 4"
-
-    # Execute the command and allow output to go directly to the console
+    # Try to import the module to catch any import errors
     try:
-        process = subprocess.Popen(
-            command, shell=True
-        )
-
-        console.print(Panel(
-                            f"Host: [bold]{host}[/bold]\nPort: [bold]{port}[/bold]\nAuto-reload: [bold]{'Enabled' if reload and dev else 'Disabled'}[/bold]\nEnvironment: [bold]{'Development' if dev else 'Production'}[/bold]\nListening to: [bold]http://{host}:{port}[/bold]", title="Server Details", subtitle=f"Open http://{host}:{port}/docs to view API documentation"
-                            , style="bold yellow" if dev else "bold green")
-                        )
-        log_start("Server running. Press CTRL+C to stop.")
-        log_info(f"Server listening to http://{host}:{port}")
-        stdout, stderr = process.communicate()
+        module_name = os.path.splitext(os.path.basename(entry_point))[0]
+        spec = importlib.util.spec_from_file_location(module_name, entry_point)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
     except Exception as e:
-        log_error(f"Failed to start the server: {str(e)}")
+        log_error(f"Error importing {entry_point}:")
+        log_error(traceback.format_exc())
         return
 
-    if process.returncode != 0:
-        log_error("Server stopped with errors.")
-        log_error(stderr.decode() if stderr else "No error details available.")
+    # Check if 'app' is defined in the module
+    if not hasattr(module, 'app'):
+        log_error(f"No 'app' object found in {entry_point}. Make sure you have defined an ASGI application named 'app'.")
+        return
 
-    log_info("Server stopped.")
+    # Determine the number of workers
+    if dev:
+        workers = 1
+    else:
+        workers = min(multiprocessing.cpu_count(), 8)
+
+    # Prepare the uvicorn configuration
+    config = uvicorn.Config(
+        f"{module_name}:app",
+        host=host,
+        port=port,
+        reload=reload and dev,
+        workers=workers,
+        log_level=log_level,
+    )
+
+    # Create the server
+    server = uvicorn.Server(config)
+
+    # Print server details
+    console.print(Panel(
+        f"Host: [bold]{host}[/bold]\n"
+        f"Port: [bold]{port}[/bold]\n"
+        f"Auto-reload: [bold]{'Enabled' if reload and dev else 'Disabled'}[/bold]\n"
+        f"Environment: [bold]{'Development' if dev else 'Production'}[/bold]\n"
+        f"Workers: [bold]{workers}[/bold]\n"
+        f"Log level: [bold]{log_level}[/bold]\n"
+        f"Listening to: [bold]http://{host}:{port}[/bold]",
+        title="Server Details",
+        subtitle=f"Open http://{host}:{port}/docs to view API documentation",
+        style="bold yellow" if dev else "bold green"
+    ))
+
+    log_start("Server running. Press CTRL+C to stop.")
+    log_info(f"Server listening to http://{host}:{port}")
+
+    # Run the server
+    try:
+        server.run()
+    except Exception as e:
+        log_error(f"Failed to start the server: {str(e)}")
+    finally:
+        log_info("Server stopped.")
 
 
 @typer_app.command()
