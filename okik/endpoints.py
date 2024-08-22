@@ -15,6 +15,7 @@ from okik.utils.configs.serviceconfigs import BackendType, ProvisioningBackend, 
 from okik.utils.configs.yaml_configs import generate_k8s_yaml_config, generate_okik_yaml_config
 from okik.logger import log_info, log_error, log_warning, log_debug, log_success, log_start, log_running
 
+
 console = Console()
 app = FastAPI()
 # Set to keep track of added routes
@@ -97,6 +98,7 @@ def create_yaml_resources(cls, replicas: int, resources: ServiceConfigs, backend
         k8s_yaml = generate_k8s_yaml_config(cls, resources, replicas)
         file_path = f".okik/services/k8/{cls.__name__.lower()}-config.yaml"
     elif backend == "okik":
+        raise NotImplementedError("Okik backend is not yet implemented! Will be available soon.")
         okik_yaml = generate_okik_yaml_config(cls, resources, replicas)
         file_path = f".okik/services/okik/serviceconfig.yaml"
     elif backend == "ray":
