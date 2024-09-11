@@ -1,42 +1,37 @@
-import asyncio
 import importlib
+import importlib.util
 import json
+import multiprocessing
 import os
 import shutil
 import subprocess
 import sys
 import time
+import traceback
 import uuid
-import yaml
 
 import pyfiglet
 import questionary
 import typer
+import uvicorn
+import yaml
 from art import text2art
 from fastapi.routing import APIRoute
 from kubernetes import client, config, utils
 from kubernetes.client import ApiException
-from okik.consts import ProjectDir
-from okik.logger import log_error, log_info, log_running, log_start, log_success
-from okik.scripts.dockerfiles.dockerfile_gen import create_dockerfile
-from rich import box
 from rich.console import Console, Group
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import Progress
-from rich.prompt import Confirm, Prompt
-from rich.status import Status
 from rich.spinner import Spinner
+from rich.status import Status
 from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
-from torch import backends
-import uvicorn
-import multiprocessing
-import importlib.util
-import traceback
 
+from okik.consts import ProjectDir
+from okik.logger import log_error, log_info, log_start, log_success
+from okik.scripts.dockerfiles.dockerfile_gen import create_dockerfile
 
 # Initialize Typer app
 typer_app = typer.Typer()
@@ -79,7 +74,7 @@ def init():
 
     docker_dir = ProjectDir.DOCKER_DIR.value
     config_dir = ProjectDir.CONFIG_DIR.value
-    with console.status("[bold green]Initializing the project...") as status:
+    with console.status("[bold green]Initializing the project..."):
         # Create directories
         folders_list = [dir.value for dir in ProjectDir]
         for folder in folders_list:
@@ -167,7 +162,7 @@ def build(
     arguments_text = "\n".join([f"{key}: {value}" for key, value in arguments.items()])
     console.print(arguments_text, style="bold blue")
 
-    with console.status("[bold green]Checking entry point file...") as status:
+    with console.status("[bold green]Checking entry point file..."):
         if not os.path.isfile(entry_point):
             log_error(f"Entry point file '{entry_point}' not found.")
             return
@@ -175,21 +170,21 @@ def build(
 
     os.makedirs(temp_dir, exist_ok=True)
 
-    with console.status("[bold green]Copying entry point file...") as status:
+    with console.status("[bold green]Copying entry point file..."):
         shutil.copy(entry_point, os.path.join(temp_dir, os.path.basename(entry_point)))
         steps.append("Copied entry point file to temporary directory.")
 
-    with console.status("[bold green]Checking Dockerfile...") as status:
+    with console.status("[bold green]Checking Dockerfile..."):
         if not os.path.isfile(docker_file):
             log_error(f"Dockerfile '{docker_file}' not found.")
             return
         steps.append("Checked Dockerfile.")
 
-    with console.status("[bold green]Copying Dockerfile...") as status:
+    with console.status("[bold green]Copying Dockerfile..."):
         shutil.copy(docker_file, os.path.join(temp_dir, os.path.basename(docker_file)))
         steps.append("Copied Dockerfile to temporary directory.")
 
-    with console.status("[bold green]Copying requirements.txt...") as status:
+    with console.status("[bold green]Copying requirements.txt..."):
         shutil.copy("requirements.txt", os.path.join(temp_dir, "requirements.txt"))
         steps.append("Copied requirements.txt file to temporary directory.")
 
@@ -270,7 +265,7 @@ def build(
         else:
             steps.append(f"Failed to build Docker image '{docker_image_name}'.")
 
-    with console.status("[bold green]Cleaning up temporary directory...") as status:
+    with console.status("[bold green]Cleaning up temporary directory..."):
         shutil.rmtree(temp_dir)
         steps.append("Cleaned up temporary directory.")
 
@@ -329,7 +324,7 @@ def server(
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
-    except Exception as e:
+    except Exception:
         log_error(f"Error importing {entry_point}:")
         log_error(traceback.format_exc())
         return
@@ -527,7 +522,7 @@ def deploy(
     # Apply the YAML documents
     console.print("Applying YAML configurations...")
     try:
-        with Status("Deploying...", spinner="dots") as status:
+        with Status("Deploying...", spinner="dots"):
             for yaml_doc in yaml_documents:
                 utils.create_from_dict(k8s_client, yaml_doc, namespace="default")
         console.print(f"Deployment applied successfully from '{selected_file}'", style="bold green")
@@ -548,10 +543,10 @@ def deploy(
             for service in services.items:
                 console.print(f"Service {service.metadata.name} is available at {service.spec.cluster_ip}:{service.spec.ports[0].port}", style="bold blue")
                 if service.metadata.name == 'embedder':
-                    console.print(f"To test the service, you can use the following command if you are using Minikube:")
-                    console.print(f"  minikube service embedder")
-                    console.print(f"Or you can port-forward the service with:")
-                    console.print(f"  kubectl port-forward service/embedder 8080:80")
+                    console.print("To test the service, you can use the following command if you are using Minikube:")
+                    console.print("  minikube service embedder")
+                    console.print("Or you can port-forward the service with:")
+                    console.print("  kubectl port-forward service/embedder 8080:80")
     except ApiException as e:
         console.print(f"Error retrieving services: {e}", style="bold red")
 
