@@ -58,6 +58,7 @@ def main(ctx: typer.Context):
         )  # Helper prompt
 
 
+
 @typer_app.command()
 def init():
     """
@@ -701,6 +702,193 @@ def cluster(context_name: str = typer.Argument(None, help="Name of the cluster c
         # List all clusters
         list_clusters()
 
+@typer_app.command()
+def serve(
+    model_id: str = typer.Argument(..., help="HuggingFace model ID to serve"),
+    docker_file: str = typer.Option(
+        ".okik/docker/Dockerfile", "--docker-file", "-d", help="Dockerfile name",
+    ),
+    app_name: str = typer.Option(
+        None, "--app-name", "-a", help="Name of the Docker image"
+    ),
+    cloud_prefix: str = typer.Option(
+        None, "--cloud-prefix", "-c", help="Prefix for the cloud service"
+    ),
+    registry_id: str = typer.Option(None, "--registry-id", "-r", help="Registry ID"),
+    tag: str = typer.Option("latest", "--tag", "-t", help="Tag for the Docker image"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Print outputs from Docker"),
+    force_build: bool = typer.Option(False, "--force-build", "-f", help="Force rebuild of the Docker image"),
+):
+    """
+    Package and serve a HuggingFace model as a Docker container
+    """
+    start_time = time.time()
+    steps = []
+    temp_dir = ProjectDir.TEMP_DIR.value
+    config_dir = ProjectDir.CONFIG_DIR.value
+
+    # Display arguments passed
+    arguments = {
+        "Model ID": model_id,
+        "Docker File": docker_file,
+        "App Name": app_name,
+        "Cloud Prefix": cloud_prefix,
+        "Registry ID": registry_id,
+        "Tag": tag,
+        "Verbose": verbose,
+        "Force Build": force_build
+    }
+
+    arguments_text = "\n".join([f"{key}: {value}" for key, value in arguments.items()])
+    console.print(arguments_text, style="bold blue")
+
+    os.makedirs(temp_dir, exist_ok=True)
+
+    # Generate the model serving code
+    model_code = f"""
+from transformers import pipeline
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import torch
+
+app = FastAPI()
+model = pipeline("text-generation", model="{model_id}")
+
+class TextRequest(BaseModel):
+    text: str
+    max_length: int = 50
+
+@app.post("/generate")
+def generate_text(request: TextRequest):
+    try:
+        result = model(request.text, max_length=request.max_length)
+        return {{"generated_text": result[0]["generated_text"]}}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    """
+
+    # Write model code to temp directory
+    with open(os.path.join(temp_dir, "main.py"), "w") as f:
+        f.write(model_code)
+    steps.append("Generated model serving code")
+
+    # Create requirements.txt
+    requirements = [
+        "fastapi",
+        "uvicorn",
+        "torch",
+        "transformers",
+        "pydantic"
+    ]
+    with open(os.path.join(temp_dir, "requirements.txt"), "w") as f:
+        f.write("\n".join(requirements))
+    steps.append("Created requirements.txt")
+
+    with console.status("[bold green]Checking Dockerfile..."):
+        if not os.path.isfile(docker_file):
+            log_error(f"Dockerfile '{docker_file}' not found.")
+            return
+        steps.append("Checked Dockerfile.")
+
+    with console.status("[bold green]Copying Dockerfile..."):
+        shutil.copy(docker_file, os.path.join(temp_dir, os.path.basename(docker_file)))
+        steps.append("Copied Dockerfile to temporary directory.")
+
+    os.makedirs(config_dir, exist_ok=True)
+    image_json_path = os.path.join(config_dir, "configs.json")
+
+    if force_build and os.path.exists(image_json_path):
+        os.remove(image_json_path)
+        console.print("Existing image configuration cleared due to force build.", style="bold yellow")
+        steps.append("Force build option applied.")
+
+    existing_app_name = None
+    if os.path.exists(image_json_path):
+        with open(image_json_path, "r") as json_file:
+            try:
+                json_content = json.load(json_file)
+                existing_app_name = json_content.get("image_name")
+                if existing_app_name:
+                    console.print(f"Using existing Docker image name: '{existing_app_name}'", style="bold blue")
+            except json.JSONDecodeError as e:
+                log_error(f"Error reading JSON file: {e}")
+
+    if existing_app_name and not force_build:
+        docker_image_name = existing_app_name
+        steps.append(f"Using existing app name from JSON: {docker_image_name}")
+    else:
+        if not app_name:
+            app_name = f"model-{model_id.replace('/', '-').lower()}"
+            steps.append(f"Generated model-based app name: {app_name}")
+        if cloud_prefix:
+            steps.append(f"Prefixed app name: {app_name}")
+            docker_image_name = f"{cloud_prefix.lower()}/{registry_id}/{app_name.lower()}:{tag}"
+        else:
+            docker_image_name = f"okik.cloud/{registry_id}/{app_name.lower()}:{tag}"
+        steps.append(f"Formatted Docker image name: {docker_image_name}")
+
+        with open(image_json_path, "w") as json_file:
+            json.dump({"image_name": docker_image_name, "app_name": app_name}, json_file)
+        steps.append("Preserved image name in JSON file.")
+
+    build_command = f"docker build --no-cache -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}" if force_build else f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
+    build_success = False
+
+    log_lines = []
+    max_lines = 5
+    spinner = Spinner("dots", text="Building Docker image")
+
+    def get_output():
+        return Group(
+            spinner,
+            *[Text(line, style="dim") for line in log_lines[-max_lines:]]
+        )
+
+    with Live(get_output(), refresh_per_second=10) as live:
+        process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+
+        for line in iter(process.stdout.readline, ''):
+            line = line.strip()
+            if line.startswith("Step "):
+                spinner.text = line
+                log_lines.append(line)
+                steps.append(line)
+            elif verbose:
+                log_lines.append(line)
+            elif "-->" in line:
+                log_lines.append(line)
+
+            live.update(get_output())
+
+        process.stdout.close()
+        return_code = process.wait()
+        build_success = return_code == 0
+
+        if build_success:
+            steps.append(f"Built Docker image '{docker_image_name}'.")
+        else:
+            steps.append(f"Failed to build Docker image '{docker_image_name}'.")
+
+    with console.status("[bold green]Cleaning up temporary directory..."):
+        shutil.rmtree(temp_dir)
+        steps.append("Cleaned up temporary directory.")
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+
+    if build_success:
+        steps.append(f"Docker image for model {model_id} built successfully in {elapsed_time:.2f} seconds.")
+        log_success(f"Docker image '{docker_image_name}' built successfully in {elapsed_time:.2f} seconds.")
+        console.print("\nTo run the model server:", style="bold green")
+        console.print(f"docker run -p 8000:80 {docker_image_name}")
+        console.print("\nTo test the API:", style="bold green")
+        console.print("curl -X POST http://localhost:8000/generate -H 'Content-Type: application/json' -d '{\"text\":\"Hello, how are\"}'")
+    else:
+        steps.append(f"Docker image build failed after {elapsed_time:.2f} seconds.")
+        log_error(f"Docker image '{docker_image_name}' build failed after {elapsed_time:.2f} seconds.")
+
+    for step in steps:
+        console.print(step, style="bold green" if build_success else "bold red")
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
