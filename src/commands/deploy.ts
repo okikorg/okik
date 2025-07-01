@@ -7,6 +7,7 @@ import { spawnSync } from 'child_process';
 import yaml from 'yaml';
 import Table from 'cli-table3';
 import { createSpinner } from '../utils/ui';
+import { KubernetesConfigError, KubernetesDeployError } from '../utils/errors';
 
 interface DeployOptions {
   entryPoint: string; // kept for parity, but unused in deploy
@@ -18,14 +19,12 @@ export const deployCommand = new Command('deploy')
   .action(async (_opts: DeployOptions) => {
     const servicesDir = path.join('.okik', 'services', 'k8');
     if (!(await fs.pathExists(servicesDir))) {
-      console.error(color.error('No services directory found. Run okik init first.'));
-      return;
+      throw new KubernetesConfigError('No services directory found. Run okik init first.');
     }
 
     const files = (await fs.readdir(servicesDir)).filter((f: string) => f.endsWith('.yaml') || f.endsWith('.yml'));
     if (!files.length) {
-      console.error(color.error('No YAML configuration files found.'));
-      return;
+      throw new KubernetesConfigError('No YAML configuration files found.');
     }
 
     const selected = await select('Select a YAML file to deploy', files);
@@ -59,7 +58,6 @@ export const deployCommand = new Command('deploy')
       console.log(color.success('Deployment applied successfully.'));
       console.log(res.stdout.trim());
     } else {
-      console.error(color.error('Failed to apply Kubernetes manifest.'));
-      if (res.stderr) console.error(res.stderr.trim());
+      throw new KubernetesDeployError(res.stderr || 'Failed to apply Kubernetes manifest.');
     }
   });

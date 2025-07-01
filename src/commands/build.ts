@@ -6,6 +6,7 @@ import Docker from 'dockerode';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { color, createSpinner } from '../utils/ui';
+import { DockerBuildError, ValidationError } from '../utils/errors';
 
 const docker = new Docker();
 const execAsync = promisify(exec);
@@ -40,9 +41,7 @@ export const buildCommand = new Command('build')
 
     // Validate entry point
     if (!(await fs.pathExists(opts.entryPoint))) {
-      console.error(color.error(`Entry point file '${opts.entryPoint}' not found.`));
-      process.exitCode = 1;
-      return;
+      throw new ValidationError(`Entry point file '${opts.entryPoint}' not found.`);
     }
     steps.push('Checked entry point file.');
 
@@ -51,9 +50,7 @@ export const buildCommand = new Command('build')
     steps.push('Copied entry point file.');
 
     if (!(await fs.pathExists(opts.dockerFile))) {
-      console.error(color.error(`Dockerfile '${opts.dockerFile}' not found.`));
-      process.exitCode = 1;
-      return;
+      throw new ValidationError(`Dockerfile '${opts.dockerFile}' not found.`);
     }
     await fs.copy(opts.dockerFile, path.join(tempDir, path.basename(opts.dockerFile)));
     steps.push('Copied Dockerfile.');
@@ -106,9 +103,7 @@ export const buildCommand = new Command('build')
       steps.push(`Built Docker image '${dockerImageName}'.`);
     } catch (err: any) {
       spinner.fail(color.error('Docker build failed'));
-      console.error(color.error(err.stderr || err.message));
-      process.exitCode = 1;
-      return;
+      throw new DockerBuildError(err.stderr || err.message);
     }
 
     // Cleanup

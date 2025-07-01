@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import { color } from '../utils/ui';
 import { spawnSync } from 'child_process';
 import { confirm as askConfirm } from '../utils/prompt';
+import { ValidationError, KubernetesDeployError } from '../utils/errors';
 
 export const deleteCommand = new Command('delete')
   .description('Delete a deployment or service in the default namespace')
@@ -9,8 +10,7 @@ export const deleteCommand = new Command('delete')
   .argument('<name>', 'Name of the resource')
   .action(async (resource: string, name: string) => {
     if (!['deployment', 'service'].includes(resource)) {
-      console.error(color.error('Unsupported resource type.'));
-      return;
+      throw new ValidationError('Unsupported resource type.');
     }
 
     const proceed = await askConfirm(`Delete ${resource} ${name}?`);
@@ -23,7 +23,6 @@ export const deleteCommand = new Command('delete')
     if (res.status === 0) {
       console.log(color.success(res.stdout.trim()));
     } else {
-      console.error(color.error('Failed to delete resource.'));
-      if (res.stderr) console.error(res.stderr.trim());
+      throw new KubernetesDeployError(res.stderr || 'Failed to delete resource.');
     }
   });
