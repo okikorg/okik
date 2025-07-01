@@ -1,209 +1,466 @@
-# About
+# Okik - Modern Cloud Deployment CLI
 
-*Okik* is a powerful command-line interface (CLI) tool designed to simplify the process of running various services using different frameworks on any cloud platform. With *Okik*, users can effortlessly deploy and manage their services directly on any cloud infrastructure without the complexity of handling their own infrastructure. This tool bridges the gap between development and deployment, allowing teams to focus on creating innovative applications rather than getting bogged down in infrastructure management.
+> **✨ A powerful TypeScript CLI tool designed to simplify the process of running various services using different frameworks on any cloud platform.**
 
-Key features of *Okik* include:
-1. Managed Kubernetes clusters: Deploy services on Kubernetes clusters without the need to manage the underlying infrastructure. *Okik* handles all aspects of cluster management, including provisioning, scaling, and monitoring, allowing users to focus on building their applications.
-2. Multi-cloud support: Deploy services across various cloud providers seamlessly. This feature allows for greater flexibility and prevents vendor lock-in, enabling users to choose the best cloud solution for their specific needs.
-3. Framework agnostic: Compatible with a wide range of popular frameworks and technologies. Use Hugging Face, FastAPI, TensorFlow, PyTorch, and more to build your services, all managed by *Okik*.
-4. LLM and GenAI integration: Easily incorporate Large Language Models and Generative AI capabilities into your applications. *Okik* provides seamless integration with popular LLM frameworks and GenAI tools, enabling advanced natural language processing and content generation within your services.
-5. Automated predictive scaling: Easily scale your services up or down based on demand. *Okik* automatically adjusts resources to meet your application's needs, ensuring optimal performance and cost-efficiency, even for resource-intensive LLM and GenAI workloads.
-6. Built-in monitoring: Keep track of your services' performance and health with integrated monitoring tools. This feature provides real-time insights into your application's behavior, helping you identify and address issues promptly, including specialized metrics for LLM and GenAI components.
-7. Streamlined deployment: Quickly deploy services with a single command. This simplifies the deployment process, reducing the time and effort required to get your application up and running, including complex LLM and GenAI-powered services.
-8. Easy-to-use CLI: Simplify the deployment process with an intuitive command-line interface. The CLI is designed to be user-friendly, even for those who may not have extensive experience with cloud deployments or AI model management.
+[![npm version](https://badge.fury.io/js/okik.svg)](https://badge.fury.io/js/okik)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.2-blue.svg)](https://www.typescriptlang.org/)
 
-*Okik* streamlines the development and deployment process, allowing developers to focus on building great applications rather than managing infrastructure. It abstracts away the complexities of cloud deployment, making it accessible to developers of all skill levels. Whether you're working on a small project or a large-scale enterprise application, *Okik* provides the flexibility and ease-of-use to meet your needs.
+## 🚀 Features
 
-By leveraging *Okik*, teams can significantly reduce the time and resources spent on infrastructure management, leading to faster development cycles and more frequent releases. It also promotes best practices in deployment and scaling, helping to ensure that your applications are robust and performant.
+Okik has been completely rewritten in TypeScript with a modern TUI and enhanced developer experience:
 
-For more information, including detailed documentation, tutorials, and community support, visit [okik.ai](www.okik.ai).
+### 🎯 Core Features
+- **🔧 Service Decorators**: Simple `@service` and `@endpoint` decorators for TypeScript classes
+- **☁️ Multi-cloud Support**: Deploy across AWS, GCP, Azure, and more
+- **🎛️ Framework Agnostic**: Works with any TypeScript/JavaScript framework
+- **🤖 LLM & GenAI Integration**: Built-in support for AI/ML workloads
+- **📈 Auto-scaling**: Intelligent resource scaling based on demand
+- **📊 Built-in Monitoring**: Real-time performance and health monitoring
+- **🚢 One-command Deploy**: Deploy with a single command
+- **💻 Modern TUI**: Beautiful terminal interface with spinners, progress bars, and colors
 
-## Installation
-Using pip
+### 🆕 Enhanced TypeScript Features
+- **🔍 Type Safety**: Full TypeScript support with strict typing
+- **📦 Modern Package Management**: Support for npm, yarn, and pnpm
+- **🔄 Hot Reload**: Development server with automatic reloading
+- **🐳 Docker Integration**: Optimized multi-stage Dockerfiles
+- **⚡ Fastify Server**: High-performance HTTP server with streaming support
+- **🎨 Enhanced CLI**: Beautiful terminal UI with gradient colors and animations
+
+## 📦 Installation
+
+### Using npm (Recommended)
 
 ```bash
-pip install okik
+npm install -g okik
 ```
 
-This is the simplest method to install Okik. It will automatically handle all dependencies and install the latest stable version of Okik.
+### Using yarn
 
-Or
-To install Okik from source, follow these steps:
-
-1. Clone the repository: `git clone https://github.com/okikorg/okik.git`
-2. Navigate to the project directory: `cd okik`
-3. Install Okik using pip: `pip install .`
-
-This method is useful if you want to contribute to Okik's development or need the latest features that haven't been released in the stable version yet.
-
-## Quick Start
-
-To run Okik, simply execute the following command in your terminal:
-`okik`
-```
-██████  ██   ██ ██ ██   ██
-██    ██ ██  ██  ██ ██  ██
-██    ██ █████   ██ █████
-██    ██ ██  ██  ██ ██  ██
-██████  ██   ██ ██ ██   ██
-
-
-
-Simplify. Deploy. Scale.
-Type 'okik --help' for more commands.
+```bash
+yarn global add okik
 ```
 
-This command launches the Okik CLI, providing you with an overview of available commands and options.
+### From Source
 
-## Initialise the project
+```bash
+git clone https://github.com/okikorg/okik.git
+cd okik
+npm install
+npm run build
+npm link
+```
+
+## 🚀 Quick Start
+
+### 1. Initialize a Project
+
 ```bash
 okik init
 ```
 
-This command sets up a new Okik project in your current directory. It creates necessary configuration files and project structure, preparing your environment for Okik-managed deployments.
+This creates:
+- `.okik/` configuration directory
+- TypeScript configuration files
+- Docker templates
+- Example service files
 
-## Quick Example
-Write this in your `main.py` file:
+### 2. Create Your First Service
 
-```python
-from okik.endpoints import service, endpoint, app
-import asyncio
-from typing import Any
-from sentence_transformers import SentenceTransformer
-import sentence_transformers
-from torch.nn.functional import cosine_similarity as cosine
-import torch
-import random
+Create a `main.ts` file:
 
-# your service configuration
-@service(
-    replicas=1,
-    resources={"accelerator": {"type": "A40", "device": "cuda", "count": 1, "memory": 4}},
-    backend="okik" # <- provisioning backend is okik
-)
-class Embedder:
-    def __init__(self):
-        self.model = SentenceTransformer("paraphrase-MiniLM-L6-v2", cache_folder=".okik/cache")
+```typescript
+import { service, endpoint } from 'okik';
+import { AcceleratorType, AcceleratorDevice, BackendType } from 'okik/types';
 
-    @endpoint()
-    def embed(self, sentence: str):
-        logits = self.model.encode(sentence)
-        return logits
+@service({
+  replicas: 1,
+  resources: {
+    accelerator: {
+      type: AcceleratorType.A40,
+      device: AcceleratorDevice.CUDA,
+      count: 1,
+      memory: 4
+    }
+  },
+  backend: BackendType.OKIK
+})
+export class EmbeddingService {
+  private model: any;
 
-    @endpoint()
-    def similarity(self, sentence1: str, sentence2: str):
-        logits1 = self.model.encode(sentence1, convert_to_tensor=True)
-        logits2 = self.model.encode(sentence2, convert_to_tensor=True)
-        return cosine(logits1.unsqueeze(0), logits2.unsqueeze(0))
+  constructor() {
+    // Initialize your model
+    console.log('🚀 Embedding service starting...');
+  }
 
-    @endpoint()
-    def version(self):
-        return sentence_transformers.__version__
+  @endpoint()
+  async embed(text: string): Promise<number[]> {
+    // Your embedding logic here
+    return new Array(768).fill(0).map(() => Math.random());
+  }
 
-    @endpoint(stream=True)
-    async def stream_data(self) -> Any:
-        async def data_generator():
-            for i in range(10):
-                yield f"data: {i}\n"
-                await asyncio.sleep(1)
-        return data_generator()
+  @endpoint()
+  async similarity(text1: string, text2: string): Promise<number> {
+    // Compute cosine similarity
+    return Math.random();
+  }
 
-# Mock LLM Service Example
-@service(replicas=1)
-class MockLLM:
-    def __init__(self):
-        pass
+  @endpoint({ stream: true })
+  async *batchEmbed(texts: string[]): AsyncGenerator<number[], void, unknown> {
+    for (const text of texts) {
+      yield await this.embed(text);
+    }
+  }
+}
 
-    @endpoint(stream=True) # <- streaming response enabled for use cases like chatbot
-    async def stream_random_words(self, prompt: str = "Hello"):
-        async def word_generator():
-            words = ["hello", "world", "fastapi", "stream", "test", "random", "words", "python", "async", "response"]
-            for _ in range(10):
-                word = random.choice(words)
-                yield f"{word}\n"
-                await asyncio.sleep(0.4)
-        return word_generator()
-
+// Streaming LLM Service
+@service({ replicas: 1 })
+export class ChatService {
+  @endpoint({ stream: true })
+  async *chat(prompt: string): AsyncGenerator<string, void, unknown> {
+    const words = prompt.split(' ');
+    for (const word of words) {
+      yield `${word} `;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+}
 ```
 
-This example demonstrates how to create services and endpoints using Okik. The `@service` decorator defines a service with specific configuration, while `@endpoint` decorators define individual API endpoints within the service. The example includes both synchronous and asynchronous endpoints, as well as streaming capabilities.
+### 3. Start the Development Server
 
-## Verify the routes
 ```bash
-# run the okik routes to check all available routes
+okik server --dev --reload
+```
+
+### 4. View Your Routes
+
+```bash
 okik routes
 ```
-```bash
-# output should be similar to this
-main.py Application Routes
-├── <HOST>/health/
-│   └── /health | GET
-├── <HOST>/embedder/
-│   ├── /embedder/embed | POST
-│   ├── /embedder/similarity | POST
-│   ├── /embedder/stream_data | POST
-│   └── /embedder/version | POST
-└── <HOST>/mockllm/
-    └── /mockllm/stream_random_words | POST
+
+```
+📋 Application Routes
+
+🔧 EMBEDDINGSERVICE Service
+   POST   /embeddingservice/embed → embed
+   POST   /embeddingservice/similarity → similarity
+   POST   /embeddingservice/batchEmbed → batchEmbed
+
+🔧 CHATSERVICE Service
+   POST   /chatservice/chat → chat
 ```
 
-This command displays all the routes defined in your application, helping you verify that your endpoints are correctly set up.
+### 5. Test Your API
 
-## Serving the app
 ```bash
-# run the okik run to start the server in production mode
-okik server
-# or run in dev mode
-okik server --dev --reload
-#or
-okik server -d -r
+# Test embedding endpoint
+curl -X POST http://localhost:3000/embeddingservice/embed \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello world"}'
+
+# Test streaming chat
+curl -X POST http://localhost:3000/chatservice/chat \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Tell me about TypeScript"}' \
+  --no-buffer
 ```
 
-These commands start your Okik server. The `--dev` and `--reload` flags are useful during development as they enable auto-reloading when code changes are detected.
+## 🛠️ CLI Commands
 
-## Test the app
+### Project Management
+
 ```bash
-curl -X POST http://0.0.0.0:3000/embedder/version
-# or if you like to use httpie then
-http POST 0.0.0.0:3000/embedder/version
+# Initialize new project
+okik init [--force]
 
-# or test the stream endpoint
-curl -X POST http://0.0.0.0:3000/mockllm/stream_random_words -d '{"prompt": "Hello"}'
-# or if you like to use httpie then
-http POST 0.0.0.0:3000/mockllm/stream_random_words prompt="hello" --stream
+# Clean temporary files
+okik clean [--all]
 ```
 
-These commands demonstrate how to test your Okik endpoints using curl or httpie. They show both regular POST requests and how to handle streaming responses.
+### Development
 
-## Build the app
 ```bash
-okik build -a "your_awesome_app" -t latest
+# Start development server
+okik server --dev --reload --port 3000
+
+# Start production server
+okik server --host 0.0.0.0 --port 8080 --workers 4
+
+# View all routes
+okik routes [--json]
 ```
 
-This command builds your application, preparing it for deployment. The `-a` flag specifies the application name, and `-t` sets the tag for the build.
+### Building & Deployment
 
-## Deploy the app
 ```bash
-okik deploy
+# Build Docker image
+okik build --app-name my-app --tag latest [--verbose]
+
+# Deploy to Kubernetes
+okik deploy [--namespace default] [--dry-run]
+
+# View deployments
+okik get deployments
+
+# View services
+okik get services
+
+# Delete resources
+okik delete deployment my-app
 ```
 
-This command deploys your built application to the configured cloud provider.
+### Cluster Management
 
-## Monitor the app
 ```bash
-# similar to kubectl commands, infact you can use kubectl commands as well
-okik get deployments # for deployments
-okik get services # for services
+# List cluster contexts
+okik cluster
+
+# Switch cluster context
+okik cluster my-context
 ```
 
-These commands allow you to monitor your deployed applications and services, providing information about their status and configuration.
+## 🎨 Enhanced TUI Features
 
-## Delete the app
-```bash
-okik delete deployment "your_awesome_app"
+The TypeScript rewrite includes a beautiful modern terminal interface:
+
+### 🌈 Visual Elements
+- **Gradient ASCII Art**: Beautiful startup banner
+- **Progress Bars**: Real-time build and deployment progress
+- **Spinners**: Animated loading indicators
+- **Color Coding**: Different colors for different log levels
+- **Boxed Output**: Important information in bordered boxes
+- **Tables**: Formatted resource listings
+
+### 🎯 Interactive Features
+- **Smart Autocomplete**: Tab completion for commands
+- **Interactive Prompts**: Choose from available options
+- **Real-time Updates**: Live server status and metrics
+- **Error Formatting**: Clear, contextual error messages
+
+## 🏗️ Architecture
+
+### Service Decorators
+
+```typescript
+// Simple service
+@service()
+class BasicService {
+  @endpoint()
+  hello(): string {
+    return "Hello, World!";
+  }
+}
+
+// Advanced service with GPU resources
+@service({
+  replicas: 3,
+  resources: {
+    accelerator: {
+      type: AcceleratorType.A100,
+      device: AcceleratorDevice.CUDA,
+      count: 2,
+      memory: 16
+    }
+  },
+  backend: BackendType.K8S,
+  port: 8080
+})
+class MLService {
+  @endpoint({ method: 'POST', path: '/predict' })
+  async predict(data: any): Promise<any> {
+    // ML inference logic
+  }
+
+  @endpoint({ stream: true })
+  async *streamPredictions(data: any[]): AsyncGenerator<any> {
+    for (const item of data) {
+      yield await this.predict(item);
+    }
+  }
+}
 ```
 
-This command removes a deployed application from your cloud environment.
+### Backend Support
 
-## Status
-Okik is currently in development so expect sharp edges and bugs. Feel free to contribute to the project by submitting a pull request. Your feedback and contributions are valuable in improving and stabilizing Okik for the wider development community.
+- **🏠 Local**: Development and testing
+- **🐳 Docker**: Containerized deployment
+- **☸️ Kubernetes**: Production orchestration
+- **☁️ Okik Cloud**: Managed platform (coming soon)
+- **🌟 Ray**: Distributed computing
+- **☁️ SkyPilot**: Multi-cloud deployment
+
+## 📊 Monitoring & Observability
+
+```typescript
+@service()
+class MonitoredService {
+  @endpoint({ method: 'GET', path: '/health' })
+  healthCheck() {
+    return {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    };
+  }
+
+  @endpoint({ stream: true, path: '/metrics' })
+  async *metrics(): AsyncGenerator<string> {
+    while (true) {
+      const data = {
+        cpu: Math.random() * 100,
+        memory: Math.random() * 100,
+        requests: Math.floor(Math.random() * 1000)
+      };
+      yield `data: ${JSON.stringify(data)}\n\n`;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+}
+```
+
+## 🔧 Configuration
+
+### Project Configuration (`.okik/configs/config.json`)
+
+```json
+{
+  "imageName": "myregistry/myapp:latest",
+  "appName": "myapp",
+  "registry": "docker.io",
+  "tag": "latest"
+}
+```
+
+### TypeScript Configuration
+
+The project includes optimized TypeScript settings:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strict": true
+  }
+}
+```
+
+## 🚀 Deployment Examples
+
+### Kubernetes Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: embedding-service
+  template:
+    metadata:
+      labels:
+        app: embedding-service
+    spec:
+      containers:
+      - name: embedding-service
+        image: myregistry/embedding-service:latest
+        resources:
+          limits:
+            memory: "4Gi"
+            nvidia.com/gpu: 1
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  okik-app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./logs:/app/logs
+```
+
+## 🎯 Migration from Python
+
+The TypeScript version maintains API compatibility while adding type safety:
+
+### Python (Old)
+```python
+from okik import service, endpoint
+
+@service(replicas=1, resources={"accelerator": {"type": "A40"}})
+class MyService:
+    @endpoint()
+    def process(self, data: str):
+        return {"result": data}
+```
+
+### TypeScript (New)
+```typescript
+import { service, endpoint } from 'okik';
+
+@service({
+  replicas: 1,
+  resources: {
+    accelerator: {
+      type: AcceleratorType.A40,
+      device: AcceleratorDevice.CUDA,
+      count: 1,
+      memory: 4
+    }
+  }
+})
+export class MyService {
+  @endpoint()
+  async process(data: string): Promise<{ result: string }> {
+    return { result: data };
+  }
+}
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+```bash
+git clone https://github.com/okikorg/okik.git
+cd okik
+npm install
+npm run dev
+```
+
+### Running Tests
+
+```bash
+npm test
+npm run test:watch
+npm run test:coverage
+```
+
+## 📝 License
+
+MIT © [Okik](https://okik.ai)
+
+## 🔗 Links
+
+- **Homepage**: [okik.ai](https://okik.ai)
+- **Documentation**: [docs.okik.ai](https://docs.okik.ai)
+- **GitHub**: [github.com/okikorg/okik](https://github.com/okikorg/okik)
+- **NPM**: [npmjs.com/package/okik](https://npmjs.com/package/okik)
+
+---
+
+**Built with ❤️ using TypeScript, Fastify, and modern CLI tools.**
