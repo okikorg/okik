@@ -5,8 +5,8 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { v4 as uuidv4 } from 'uuid';
 import Docker from 'dockerode';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 const docker = new Docker();
 const execAsync = promisify(exec);

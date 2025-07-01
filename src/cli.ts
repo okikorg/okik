@@ -3,6 +3,12 @@ import chalk from 'chalk';
 import figlet from 'figlet';
 import { initCommand } from './commands/init';
 import { buildCommand } from './commands/build';
+import { serverCommand } from './commands/server';
+import { routesCommand } from './commands/routes';
+import { deployCommand } from './commands/deploy';
+import { getCommand } from './commands/get';
+import { deleteCommand } from './commands/delete';
+import { clusterCommand } from './commands/cluster';
 // Import other commands as they are implemented
 
 const program = new Command();
@@ -23,11 +29,11 @@ program
 // Register commands
 program.addCommand(initCommand);
 program.addCommand(buildCommand);
-// program.addCommand(serverCommand);
-// program.addCommand(routesCommand);
-// program.addCommand(deployCommand);
-// program.addCommand(getCommand);
-// program.addCommand(deleteCommand);
-// program.addCommand(clusterCommand);
+program.addCommand(serverCommand);
+program.addCommand(routesCommand);
+program.addCommand(deployCommand);
+program.addCommand(getCommand);
+program.addCommand(deleteCommand);
+program.addCommand(clusterCommand);
 
 program.parse(process.argv);
