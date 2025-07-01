@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { color } from '../utils/ui';
 import { spawnSync } from 'child_process';
-import { Confirm } from 'enquirer';
+import { confirm as askConfirm } from '../utils/prompt';
 
 export const deleteCommand = new Command('delete')
   .description('Delete a deployment or service in the default namespace')
@@ -13,8 +13,7 @@ export const deleteCommand = new Command('delete')
       return;
     }
 
-    const confirmPrompt = new Confirm({ name: 'confirm', message: `Delete ${resource} ${name}?` });
-    const proceed = await confirmPrompt.run();
+    const proceed = await askConfirm(`Delete ${resource} ${name}?`);
     if (!proceed) {
       console.log(color.warning('Deletion aborted.'));
       return;

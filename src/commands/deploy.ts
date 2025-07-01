@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
 import { color } from '../utils/ui';
-import { Select, Confirm } from 'enquirer';
+import { confirm as askConfirm, select } from '../utils/prompt';
 import { spawnSync } from 'child_process';
 import yaml from 'yaml';
 import Table from 'cli-table3';
@@ -28,13 +28,7 @@ export const deployCommand = new Command('deploy')
       return;
     }
 
-    const selectPrompt = new Select({
-      name: 'file',
-      message: 'Select a YAML file to deploy',
-      choices: files,
-    });
-
-    const selected = await selectPrompt.run();
+    const selected = await select('Select a YAML file to deploy', files);
     if (!selected) {
       console.log(color.warning('No file selected. Deployment cancelled.'));
       return;
@@ -50,8 +44,7 @@ export const deployCommand = new Command('deploy')
     console.log(color.accent('\nResources to be deployed:'));
     console.log(table.toString());
 
-    const confirm = new Confirm({ name: 'confirm', message: 'Continue with deployment?' });
-    const proceed = await confirm.run();
+    const proceed = await askConfirm('Continue with deployment?');
     if (!proceed) {
       console.log(color.warning('Deployment cancelled.'));
       return;
