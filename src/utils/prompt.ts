@@ -1,4 +1,5 @@
-import { Confirm, Select, Input } from 'enquirer';
+import Enquirer from 'enquirer';
+const { Confirm, Select, Input } = Enquirer as any;
 import { color } from './ui';
 
 export async function confirm(message: string): Promise<boolean> {
