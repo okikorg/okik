@@ -12,6 +12,7 @@ import uuid
 import concurrent.futures
 import re
 import functools
+import asyncio
 
 import pyfiglet
 import questionary
@@ -224,41 +225,41 @@ def build(
         steps.append("Checked Dockerfile.")
         progress.update(prepare_task, advance=1)
 
-        # 4️⃣ Copy files concurrently (entry point, Dockerfile, requirements)
+        # 4️⃣ Copy files concurrently using asyncio for efficiency
         copy_jobs = [
             (entry_point, os.path.join(temp_dir, os.path.basename(entry_point))),
             (docker_file, os.path.join(temp_dir, os.path.basename(docker_file))),
             ("requirements.txt", os.path.join(temp_dir, "requirements.txt")),
         ]
 
-        def _safe_copy(src_dst):  # inner for ThreadPool
-            src, dst = src_dst
+        async def _async_copy(src: str, dst: str) -> str:
             if not os.path.exists(src):
                 raise FileNotFoundError(src)
-            shutil.copy(src, dst)
+            # Run blocking shutil.copy in a threadpool to avoid blocking event loop
+            await asyncio.to_thread(shutil.copy, src, dst)
             return os.path.basename(src)
 
+        async def _copy_all():
+            tasks = [_async_copy(src, dst) for src, dst in copy_jobs]
+            for coro in asyncio.as_completed(tasks):
+                try:
+                    src_name = await coro
+                    steps.append(f"Copied {src_name} concurrently.")
+                except FileNotFoundError as fnf:
+                    log_error(f"File not found during copy: {fnf}")
+                    raise typer.Exit(code=1)
+                except PermissionError as perr:
+                    log_error(f"Permission denied copying file: {perr}")
+                    raise typer.Exit(code=1)
+                except Exception as exc:
+                    log_error(f"Unexpected error during copy: {exc}")
+                    raise typer.Exit(code=1)
+                finally:
+                    progress.update(prepare_task, advance=1)
+
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                future_map = {executor.submit(_safe_copy, job): job[0] for job in copy_jobs}
-                for fut in concurrent.futures.as_completed(future_map):
-                    src_name = os.path.basename(future_map[fut])
-                    try:
-                        fut.result()
-                        steps.append(f"Copied {src_name} concurrently.")
-                    except FileNotFoundError as fnf:
-                        log_error(f"File not found during copy: {fnf}")
-                        raise typer.Exit(code=1)
-                    except PermissionError as perr:
-                        log_error(f"Permission denied copying {src_name}: {perr}")
-                        raise typer.Exit(code=1)
-                    except Exception as exc:
-                        log_error(f"Unexpected error copying {src_name}: {exc}")
-                        raise typer.Exit(code=1)
-                    finally:
-                        progress.update(prepare_task, advance=1)
+            asyncio.run(_copy_all())
         except Exception:
-            # Ensure temp_dir is removed on error to avoid clutter
             shutil.rmtree(temp_dir, ignore_errors=True)
             raise
     # Progress context exits here (bar cleared)
