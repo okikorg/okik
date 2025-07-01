@@ -28,6 +28,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 
 from okik.consts import ProjectDir
 from okik.logger import log_error, log_info, log_start, log_success
@@ -78,9 +79,23 @@ def init():
     with console.status("[bold green]Initializing the project..."):
         # Create directories
         folders_list = [dir.value for dir in ProjectDir]
-        for folder in folders_list:
-            os.makedirs(folder, exist_ok=True)
-            tasks[folders_list.index(folder)]["status"] = "completed"
+
+        # Use Rich Progress to give the user instant visual feedback
+        progress = Progress(
+            SpinnerColumn(style="green"),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(bar_width=None),
+            TimeElapsedColumn(),
+            console=console,
+        )
+
+        with progress:
+            progress_task = progress.add_task("Creating project structure...", total=len(folders_list))
+
+            for folder in folders_list:
+                os.makedirs(folder, exist_ok=True)
+                tasks[folders_list.index(folder)]["status"] = "completed"
+                progress.update(progress_task, advance=1)
 
         # Use dockerfile_gen to generate the Dockerfile
         try:
