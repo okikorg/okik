@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { color } from './ui';
 
 /**
@@ -16,21 +17,63 @@ export class FileNotFoundError extends CliError {
   }
 }
 
-export class DockerError extends CliError {
+/**
+ * Docker errors
+ */
+export class DockerBuildError extends CliError {
   constructor(message: string) {
-    super(`Docker error: ${message}`);
+    super(`Docker build error: ${message}`);
   }
 }
 
-export class KubernetesError extends CliError {
+export class DockerRunError extends CliError {
   constructor(message: string) {
-    super(`Kubernetes error: ${message}`);
+    super(`Docker run error: ${message}`);
   }
 }
 
+/**
+ * Kubernetes errors
+ */
+export class KubernetesDeployError extends CliError {
+  constructor(message: string) {
+    super(`Kubernetes deploy error: ${message}`);
+  }
+}
+
+export class KubernetesConfigError extends CliError {
+  constructor(message: string) {
+    super(`Kubernetes config error: ${message}`);
+  }
+}
+
+/**
+ * Validation / Configuration
+ */
 export class ValidationError extends CliError {
   constructor(message: string) {
     super(`Validation error: ${message}`);
+  }
+}
+
+export class ConfigurationError extends CliError {
+  constructor(message: string) {
+    super(`Configuration error: ${message}`);
+  }
+}
+
+/**
+ * Runtime/network errors
+ */
+export class NetworkError extends CliError {
+  constructor(message: string) {
+    super(`Network error: ${message}`);
+  }
+}
+
+export class TimeoutError extends CliError {
+  constructor(message: string) {
+    super(`Timeout error: ${message}`);
   }
 }
 
