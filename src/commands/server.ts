@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import chalk from 'chalk';
+import { color } from '../utils/ui';
 import { spawn } from 'child_process';
 import path from 'path';
 import os from 'os';
@@ -48,8 +48,8 @@ export const serverCommand = new Command('server')
       args.push('--workers', String(workers));
     }
 
-    console.log(chalk.yellow('Starting Uvicorn server...'));
-    console.log(chalk.green(`Host: ${opts.host}\nPort: ${opts.port}\nReload: ${opts.reload && opts.dev}\nEnvironment: ${opts.dev ? 'Development' : 'Production'}\nWorkers: ${workers}`));
+    console.log(color.warning('Starting Uvicorn server...'));
+    console.log(color.success(`Host: ${opts.host}\nPort: ${opts.port}\nReload: ${opts.reload && opts.dev}\nEnvironment: ${opts.dev ? 'Development' : 'Production'}\nWorkers: ${workers}`));
 
     // Spawn the python process
     const proc = spawn('python', args, {
@@ -58,9 +58,9 @@ export const serverCommand = new Command('server')
 
     proc.on('close', (code: number | null) => {
       if (code === 0) {
-        console.log(chalk.green('Server stopped.'));
+        console.log(color.success('Server stopped.'));
       } else {
-        console.error(chalk.red(`Server exited with code ${code}`));
+        console.error(color.error(`Server exited with code ${code}`));
       }
     });
   });

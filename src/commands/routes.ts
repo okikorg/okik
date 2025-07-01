@@ -1,7 +1,7 @@
 import { Command } from 'commander';
-import chalk from 'chalk';
 import { spawnSync } from 'child_process';
 import Table from 'cli-table3';
+import { color } from '../utils/ui';
 
 interface RoutesOptions {
   entryPoint: string;
@@ -37,7 +37,7 @@ print(json.dumps(routes))`;
     });
 
     if (result.error) {
-      console.error(chalk.red(`Failed to run python: ${result.error.message}`));
+      console.error(color.error(`Failed to run python: ${result.error.message}`));
       return;
     }
 
@@ -45,17 +45,17 @@ print(json.dumps(routes))`;
       const data = JSON.parse(result.stdout.trim());
       if (Array.isArray(data)) {
         if (data.length === 0) {
-          console.log(chalk.yellow('No routes found.'));
+          console.log(color.warning('No routes found.'));
           return;
         }
         const table = new Table({ head: ['Path', 'Methods'] });
         data.forEach((r: any) => table.push([r.path, r.methods.join(', ')]));
         console.log(table.toString());
       } else if (data.error) {
-        console.error(chalk.red(data.error));
+        console.error(color.error(data.error));
       }
     } catch (err) {
-      console.error(chalk.red('Failed to parse routes information.'));
+      console.error(color.error('Failed to parse routes information.'));
       if (result.stdout) console.error(result.stdout);
       if (result.stderr) console.error(result.stderr);
     }

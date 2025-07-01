@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import figlet from 'figlet';
 import ora from 'ora';
+import type { Ora } from 'ora';
 
 export const color = {
   primary: chalk.hex('#00b894'),
@@ -18,6 +19,6 @@ export function renderBanner(): void {
   console.log(color.dim("Type 'okik --help' for more commands.\n"));
 }
 
-export function createSpinner(text: string) {
+export function createSpinner(text: string): Ora {
   return ora({ text, spinner: 'dots' }).start();
 }

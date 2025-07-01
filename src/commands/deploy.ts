@@ -1,12 +1,12 @@
 import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
-import chalk from 'chalk';
+import { color } from '../utils/ui';
 import { Select, Confirm } from 'enquirer';
-import ora from 'ora';
 import { spawnSync } from 'child_process';
 import yaml from 'yaml';
 import Table from 'cli-table3';
+import { createSpinner } from '../utils/ui';
 
 interface DeployOptions {
   entryPoint: string; // kept for parity, but unused in deploy
@@ -18,13 +18,13 @@ export const deployCommand = new Command('deploy')
   .action(async (_opts: DeployOptions) => {
     const servicesDir = path.join('.okik', 'services', 'k8');
     if (!(await fs.pathExists(servicesDir))) {
-      console.error(chalk.red('No services directory found. Run okik init first.'));
+      console.error(color.error('No services directory found. Run okik init first.'));
       return;
     }
 
     const files = (await fs.readdir(servicesDir)).filter((f: string) => f.endsWith('.yaml') || f.endsWith('.yml'));
     if (!files.length) {
-      console.error(chalk.red('No YAML configuration files found.'));
+      console.error(color.error('No YAML configuration files found.'));
       return;
     }
 
@@ -36,7 +36,7 @@ export const deployCommand = new Command('deploy')
 
     const selected = await selectPrompt.run();
     if (!selected) {
-      console.log(chalk.yellow('No file selected. Deployment cancelled.'));
+      console.log(color.warning('No file selected. Deployment cancelled.'));
       return;
     }
 
@@ -45,28 +45,28 @@ export const deployCommand = new Command('deploy')
 
     // Display YAML summary table for docs inside file
     const docs = yaml.parseAllDocuments(docContent).map((d) => d.toJSON());
-    const table = new Table({ head: ['Kind', 'Name'] });
+    const table = new Table({ head: [color.accent('Kind'), color.accent('Name')] });
     docs.forEach((d: any) => table.push([d.kind, d.metadata?.name]));
-    console.log(chalk.cyan('\nResources to be deployed:'));
+    console.log(color.accent('\nResources to be deployed:'));
     console.log(table.toString());
 
     const confirm = new Confirm({ name: 'confirm', message: 'Continue with deployment?' });
     const proceed = await confirm.run();
     if (!proceed) {
-      console.log(chalk.yellow('Deployment cancelled.'));
+      console.log(color.warning('Deployment cancelled.'));
       return;
     }
 
-    const spinner = ora('Applying configuration').start();
+    const spinner = createSpinner('Applying configuration');
     // Use kubectl apply -f yamlPath
     const res = spawnSync('kubectl', ['apply', '-f', yamlPath], { encoding: 'utf8' });
     spinner.stop();
 
     if (res.status === 0) {
-      console.log(chalk.green('Deployment applied successfully.'));
+      console.log(color.success('Deployment applied successfully.'));
       console.log(res.stdout.trim());
     } else {
-      console.error(chalk.red('Failed to apply Kubernetes manifest.'));
+      console.error(color.error('Failed to apply Kubernetes manifest.'));
       if (res.stderr) console.error(res.stderr.trim());
     }
   });
