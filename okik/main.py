@@ -163,46 +163,54 @@ def build(
     temp_dir = ProjectDir.TEMP_DIR.value
     config_dir = ProjectDir.CONFIG_DIR.value
 
-    # Display arguments passed
-    arguments = {
-        "Entry Point": entry_point,
-        "Docker File": docker_file,
-        "App Name": app_name,
-        "Cloud Prefix": cloud_prefix,
-        "Registry ID": registry_id,
-        "Tag": tag,
-        "Verbose": verbose,
-        "Force Build": force_build
-    }
+    # ---------------------
+    # Visual progress setup
+    # ---------------------
+    progress = Progress(
+        SpinnerColumn(style="green"),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=None),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,  # Remove after completion
+    )
 
-    arguments_text = "\n".join([f"{key}: {value}" for key, value in arguments.items()])
-    console.print(arguments_text, style="bold blue")
+    # We will execute the context-preparation steps inside a single progress task.
+    prepare_steps_total = 5  # Checking entrypoint, copy entrypoint, check Dockerfile, copy Dockerfile, copy requirements
 
-    with console.status("[bold green]Checking entry point file..."):
+    with progress:
+        prepare_task = progress.add_task("Preparing build context...", total=prepare_steps_total)
+
+        # 1️⃣ Check entry point file exists
         if not os.path.isfile(entry_point):
             log_error(f"Entry point file '{entry_point}' not found.")
             return
         steps.append("Checked entry point file.")
+        progress.update(prepare_task, advance=1)
 
-    os.makedirs(temp_dir, exist_ok=True)
-
-    with console.status("[bold green]Copying entry point file..."):
+        # 2️⃣ Ensure temporary directory and copy entry point
+        os.makedirs(temp_dir, exist_ok=True)
         shutil.copy(entry_point, os.path.join(temp_dir, os.path.basename(entry_point)))
         steps.append("Copied entry point file to temporary directory.")
+        progress.update(prepare_task, advance=1)
 
-    with console.status("[bold green]Checking Dockerfile..."):
+        # 3️⃣ Check Dockerfile presence
         if not os.path.isfile(docker_file):
             log_error(f"Dockerfile '{docker_file}' not found.")
             return
         steps.append("Checked Dockerfile.")
+        progress.update(prepare_task, advance=1)
 
-    with console.status("[bold green]Copying Dockerfile..."):
+        # 4️⃣ Copy Dockerfile
         shutil.copy(docker_file, os.path.join(temp_dir, os.path.basename(docker_file)))
         steps.append("Copied Dockerfile to temporary directory.")
+        progress.update(prepare_task, advance=1)
 
-    with console.status("[bold green]Copying requirements.txt..."):
+        # 5️⃣ Copy requirements.txt
         shutil.copy("requirements.txt", os.path.join(temp_dir, "requirements.txt"))
         steps.append("Copied requirements.txt file to temporary directory.")
+        progress.update(prepare_task, advance=1)
+    # Progress context exits here (bar cleared)
 
     os.makedirs(config_dir, exist_ok=True)
     image_json_path = os.path.join(config_dir, "configs.json")
