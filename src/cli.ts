@@ -1,6 +1,6 @@
+#!/usr/bin/env node
 import { Command } from 'commander';
-import chalk from 'chalk';
-import figlet from 'figlet';
+import { renderBanner } from './utils/ui';
 import { initCommand } from './commands/init';
 import { buildCommand } from './commands/build';
 import { serverCommand } from './commands/server';
@@ -14,12 +14,7 @@ import { clusterCommand } from './commands/cluster';
 const program = new Command();
 
 // Banner
-const banner = figlet.textSync('Okik', {
-  font: 'ANSI Shadow',
-});
-console.log(chalk.green.bold(banner));
-console.log(chalk.green.bold('Simplify. Deploy. Scale.'));
-console.log(chalk.dim("Type 'okik --help' for more commands.\n"));
+renderBanner();
 
 program
   .name('okik')
