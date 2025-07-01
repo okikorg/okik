@@ -37,6 +37,8 @@
     "@types/uuid": "^9.0.2",
     "@types/dockerode": "^2.5.11",
     "@types/cli-table3": "^0.6.2",
-    "@types/enquirer": "^2.3.5"
+    "@types/enquirer": "^2.3.5",
+    "@types/chalk": "^4.1.1",
+    "@types/yaml": "^2.0.0"
   }
 }
