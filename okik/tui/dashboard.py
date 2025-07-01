@@ -117,17 +117,147 @@ class BuildView(Static):
 
 
 class DeployView(Static):
-    """Placeholder for the Deploy monitoring view."""
+    """Deploy a selected YAML file and display progress logs."""
+
+    deploying: reactive[bool] = reactive(False)
 
     def compose(self) -> ComposeResult:  # type: ignore[override]
-        yield Static("[bold cyan]Deploy view coming soon…[/bold cyan]", markup=True)
+        yield Static("[b]Kubernetes Deploy[/b] • Choose YAML and press [green]Deploy[/green]", markup=True)
+        yield Input(placeholder="/path/to/manifest.yaml", id="yamlpath")
+        yield Button("Browse", id="browse")
+        yield Button("Deploy", id="deploy", variant="success")
+        yield ProgressBar(total=1, id="progress-deploy")
+        yield Static("", id="deploy-log", expand=True)
+
+    def watch_deploying(self, value: bool) -> None:
+        bar = self.query_one("#progress-deploy", ProgressBar)
+        bar.animate = value  # type: ignore[attr-defined]
+
+    async def on_button_pressed(self, event: Button.Pressed) -> None:  # type: ignore
+        btn_id = event.button.id
+        if btn_id == "browse":
+            # Auto-fill input with first YAML found in services dir
+            from pathlib import Path
+            from okik.consts import ProjectDir
+
+            services_dir = Path(ProjectDir.SERVICES_DIR.value) / "k8"
+            ymls = list(services_dir.glob("*.y*ml"))
+            if ymls:
+                self.query_one("#yamlpath", Input).value = str(ymls[0])
+        elif btn_id == "deploy":
+            yaml_path = self.query_one("#yamlpath", Input).value.strip()
+            if not yaml_path:
+                self.query_one("#deploy-log", Static).update("[red]Please specify a YAML file.[/red]")
+                return
+            await self._start_deploy(yaml_path)
+
+    async def _start_deploy(self, yaml_path: str):
+        from okik.main import _import_kubernetes
+        import yaml as _yaml
+        from pathlib import Path
+
+        log = self.query_one("#deploy-log", Static)
+        log.update(f"Starting deployment of {yaml_path}\n")
+
+        path_obj = Path(yaml_path)
+        if not path_obj.exists():
+            log.update(f"[red]File not found: {yaml_path}[/red]")
+            return
+
+        # Read YAML documents for later display
+        try:
+            documents = list(_yaml.safe_load_all(path_obj.read_text()))
+        except Exception as exc:
+            log.update(f"[red]Failed to parse YAML: {exc}[/red]")
+            return
+
+        # Worker coroutine to interact with K8s
+        async def _worker():
+            _import_kubernetes()
+            api_client = client.ApiClient()
+            self.call_from_thread(self._update_deploy_progress, 0, 1)
+
+            from kubernetes import utils as k8s_utils  # type: ignore
+
+            for idx, doc in enumerate(documents, start=1):
+                try:
+                    k8s_utils.create_from_dict(api_client, doc, namespace="default")
+                    self.call_from_thread(self._append_deploy_log, f"Applied {doc.get('kind')} {doc.get('metadata', {}).get('name')}")
+                except Exception as exc:
+                    self.call_from_thread(self._append_deploy_log, f"[red]Error: {exc}[/red]")
+                self.call_from_thread(self._update_deploy_progress, idx, len(documents))
+
+            self.call_from_thread(self._append_deploy_log, "[green]Deployment finished.[/green]")
+
+        self.deploying = True
+        self.app.run_worker(_worker(), description="deploy")
+
+    # helper methods
+    def _update_deploy_progress(self, current: int, total: int):
+        bar = self.query_one("#progress-deploy", ProgressBar)
+        bar.update(total=total, progress=current)
+
+    def _append_deploy_log(self, line: str, max_lines: int = 100):
+        log = self.query_one("#deploy-log", Static)
+        existing = str(log.renderable)
+        lines = (existing + "\n" + line).splitlines()[-max_lines:]
+        log.update("\n".join(lines))
 
 
 class ClusterView(Static):
-    """Placeholder for Cluster monitoring view."""
+    """Live resource monitoring for Deployments and Services."""
+
+    refresh_task = None  # handle to cancel on unmount
 
     def compose(self) -> ComposeResult:  # type: ignore[override]
-        yield Static("[bold yellow]Cluster view coming soon…[/bold yellow]", markup=True)
+        yield Static("[b]Cluster Resources (auto-refresh every 5s)[/b]", markup=True)
+        yield Static("Loading…", id="cluster-body", expand=True)
+
+    async def on_mount(self) -> None:  # type: ignore
+        # schedule periodic refresh every 5 seconds
+        self.refresh_task = self.set_interval(5, self._refresh_data, pause=False)
+        await self._refresh_data()
+
+    async def on_unmount(self) -> None:  # type: ignore
+        if self.refresh_task:
+            self.refresh_task.stop()
+
+    async def _refresh_data(self):
+        from okik.main import _import_kubernetes
+        _import_kubernetes()
+
+        try:
+            config.load_kube_config()
+        except Exception:
+            self.query_one("#cluster-body", Static).update("[red]Could not load kubeconfig.[/red]")
+            return
+
+        apps_v1 = client.AppsV1Api()
+        core_v1 = client.CoreV1Api()
+
+        try:
+            deployments = apps_v1.list_namespaced_deployment(namespace="default")
+            services = core_v1.list_namespaced_service(namespace="default")
+        except Exception as exc:
+            self.query_one("#cluster-body", Static).update(f"[red]{exc}[/red]")
+            return
+
+        from rich.tree import Tree
+
+        root = Tree("[bold cyan]default namespace[/bold cyan]")
+
+        dep_node = root.add("[magenta]Deployments[/magenta]")
+        for d in deployments.items:
+            replicas = d.status.available_replicas or 0
+            desired = d.spec.replicas
+            dep_node.add(f"{d.metadata.name} • {replicas}/{desired} ready")
+
+        svc_node = root.add("[green]Services[/green]")
+        for s in services.items:
+            ports = ", ".join([f"{p.port}/{p.protocol}" for p in s.spec.ports])
+            svc_node.add(f"{s.metadata.name} • {s.spec.type} • {ports}")
+
+        self.query_one("#cluster-body", Static).update(root)
 
 
 class OkikDashboard(App):
