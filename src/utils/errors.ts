@@ -1,10 +1,7 @@
 import { color } from './ui';
 
-declare const process: NodeJS.Process;
-
 /**
- * Base class for all CLI errors. These errors should be caught at the top level and
- * reported nicely to the user, then cause a non-zero exit code.
+ * Base error for all CLI related failures
  */
 export class CliError extends Error {
   constructor(message: string, public readonly exitCode: number = 1) {
@@ -38,19 +35,20 @@ export class ValidationError extends CliError {
 }
 
 /**
- * Utility that prints the error nicely and exits. This is re-exported so callers
- * can simply `catch(handleError)`.
+ * Centralised error handler – use at program entry
  */
 export function handleError(err: unknown): void {
   if (err instanceof CliError) {
     console.error(color.error(err.message));
     process.exit(err.exitCode);
   }
+
   if (err instanceof Error) {
     console.error(color.error(`Unexpected error: ${err.message}`));
     if (process.env.DEBUG) console.error(err.stack);
   } else {
     console.error(color.error('An unknown error occurred.'));
   }
+
   process.exit(1);
 }
