@@ -238,18 +238,29 @@ def build(
             shutil.copy(src, dst)
             return os.path.basename(src)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            future_map = {executor.submit(_safe_copy, job): job[0] for job in copy_jobs}
-            for fut in concurrent.futures.as_completed(future_map):
-                src_name = os.path.basename(future_map[fut])
-                try:
-                    fut.result()
-                    steps.append(f"Copied {src_name} concurrently.")
-                except Exception as exc:
-                    log_error(f"Failed to copy {src_name}: {exc}")
-                    raise typer.Exit(code=1)
-                finally:
-                    progress.update(prepare_task, advance=1)
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                future_map = {executor.submit(_safe_copy, job): job[0] for job in copy_jobs}
+                for fut in concurrent.futures.as_completed(future_map):
+                    src_name = os.path.basename(future_map[fut])
+                    try:
+                        fut.result()
+                        steps.append(f"Copied {src_name} concurrently.")
+                    except FileNotFoundError as fnf:
+                        log_error(f"File not found during copy: {fnf}")
+                        raise typer.Exit(code=1)
+                    except PermissionError as perr:
+                        log_error(f"Permission denied copying {src_name}: {perr}")
+                        raise typer.Exit(code=1)
+                    except Exception as exc:
+                        log_error(f"Unexpected error copying {src_name}: {exc}")
+                        raise typer.Exit(code=1)
+                    finally:
+                        progress.update(prepare_task, advance=1)
+        except Exception:
+            # Ensure temp_dir is removed on error to avoid clutter
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            raise
     # Progress context exits here (bar cleared)
 
     os.makedirs(config_dir, exist_ok=True)
@@ -312,7 +323,14 @@ def build(
         task_id = None
         last_completed = 0
 
-        process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+        try:
+            process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+        except FileNotFoundError:
+            console.print("[bold red]Docker executable not found. Please ensure Docker is installed and in PATH.[/bold red]")
+            return
+        except Exception as exc:
+            console.print(f"[bold red]Failed to start docker build: {exc}[/bold red]")
+            return
 
         for raw_line in iter(process.stdout.readline, ''):
             line = raw_line.strip()
@@ -958,7 +976,14 @@ def generate_text(request: TextRequest):
         task_id = None
         last_completed = 0
 
-        process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+        try:
+            process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+        except FileNotFoundError:
+            console.print("[bold red]Docker executable not found. Please ensure Docker is installed and in PATH.[/bold red]")
+            return
+        except Exception as exc:
+            console.print(f"[bold red]Failed to start docker build: {exc}[/bold red]")
+            return
 
         for raw_line in iter(process.stdout.readline, ''):
             line = raw_line.strip()

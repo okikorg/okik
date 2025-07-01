@@ -31,3 +31,5 @@ kubernetes
 questionary
 uvicorn
 textual>=0.46
+transformers
+aiofiles
