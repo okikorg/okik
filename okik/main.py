@@ -996,6 +996,24 @@ def generate_text(request: TextRequest):
     for step in steps:
         console.print(step, style="bold green" if build_success else "bold red")
 
+# -----------------------------------------------------------------------------
+# Dashboard (Textual) Command
+# -----------------------------------------------------------------------------
+
+
+@typer_app.command()
+def dashboard():
+    """Launch the full-screen Textual dashboard."""
+
+    try:
+        from okik.tui.dashboard import OkikDashboard
+    except ModuleNotFoundError:
+        console.print("[bold red]Textual is not installed. Run `pip install textual`.[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print("Launching Okik dashboard... (press q to quit)", style="bold green")
+    OkikDashboard().run()
+
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         ascii_art = text2art("Okik", font="block")  # Generate ASCII art

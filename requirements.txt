@@ -30,3 +30,4 @@ httpie
 kubernetes
 questionary
 uvicorn
+textual>=0.46
