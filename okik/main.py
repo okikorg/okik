@@ -10,6 +10,7 @@ import time
 import traceback
 import uuid
 import re
+import functools
 
 import pyfiglet
 import questionary
@@ -646,12 +647,17 @@ def get_resources(resource: str):
     else:
         console.print(f"Unsupported resource type: {resource}", style="bold red")
 
+@functools.lru_cache(maxsize=32)
+def _cached_deployments(ts: int):
+    """Internal helper to cache deployments for 30s; ts is floored timestamp key."""
+    apps_v1 = client.AppsV1Api()
+    return apps_v1.list_namespaced_deployment(namespace="default")
+
 def get_deployments():
     """Display deployments in a navigable Tree and page the output if it is long."""
     _import_kubernetes()
-    apps_v1 = client.AppsV1Api()
     try:
-        deployments = apps_v1.list_namespaced_deployment(namespace="default")
+        deployments = _cached_deployments(int(time.time() // 30))
         if not deployments.items:
             console.print("No deployments found in the default namespace.", style="bold yellow")
             return
@@ -668,12 +674,16 @@ def get_deployments():
     except client.exceptions.ApiException as e:
         console.print(f"Error listing deployments: {e}", style="bold red")
 
+@functools.lru_cache(maxsize=32)
+def _cached_services(ts: int):
+    core_v1 = client.CoreV1Api()
+    return core_v1.list_namespaced_service(namespace="default")
+
 def get_services():
     """Display services in a navigable Tree and page the output if it is long."""
     _import_kubernetes()
-    core_v1 = client.CoreV1Api()
     try:
-        services = core_v1.list_namespaced_service(namespace="default")
+        services = _cached_services(int(time.time() // 30))
         if not services.items:
             console.print("No services found in the default namespace.", style="bold yellow")
             return

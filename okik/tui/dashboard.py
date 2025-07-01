@@ -140,7 +140,7 @@ class DeployView(Static):
             from pathlib import Path
             from okik.consts import ProjectDir
 
-            services_dir = Path(ProjectDir.SERVICES_DIR.value) / "k8"
+            services_dir = Path(ProjectDir.SERVICES_DIR.value) / "k8"  # type: ignore[attr-defined]
             ymls = list(services_dir.glob("*.y*ml"))
             if ymls:
                 self.query_one("#yamlpath", Input).value = str(ymls[0])
@@ -174,6 +174,7 @@ class DeployView(Static):
         # Worker coroutine to interact with K8s
         async def _worker():
             _import_kubernetes()
+            from okik.main import client  # type: ignore
             api_client = client.ApiClient()
             self.call_from_thread(self._update_deploy_progress, 0, 1)
 
@@ -225,6 +226,7 @@ class ClusterView(Static):
     async def _refresh_data(self):
         from okik.main import _import_kubernetes
         _import_kubernetes()
+        from okik.main import client, config  # type: ignore
 
         try:
             config.load_kube_config()
