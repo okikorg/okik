@@ -9,6 +9,7 @@ import sys
 import time
 import traceback
 import uuid
+import re
 
 import pyfiglet
 import questionary
@@ -254,35 +255,58 @@ def build(
     build_command = f"docker build --no-cache -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}" if force_build else f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
     build_success = False
 
-    log_lines = []
-    max_lines = 5  # Adjust this value to show more or fewer lines
-    spinner = Spinner("dots", text="Building Docker image")
+    # ------------------------------
+    # Docker build with layer bar 🔨
+    # ------------------------------
+    progress_build = Progress(
+        SpinnerColumn(style="cyan"),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=None),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeElapsedColumn(),
+        console=console,
+    )
 
-    def get_output():
-        return Group(
-            spinner,
-            *[Text(line, style="dim") for line in log_lines[-max_lines:]]
-        )
+    with progress_build:
+        task_id = None
+        last_completed = 0
 
-    with Live(get_output(), refresh_per_second=10) as live:
         process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
 
-        for line in iter(process.stdout.readline, ''):
-            line = line.strip()
-            if line.startswith("Step "):
-                spinner.text = line
-                log_lines.append(line)
-                steps.append(line)
-            elif verbose:
-                log_lines.append(line)
-            elif "-->" in line:
-                log_lines.append(line)
+        for raw_line in iter(process.stdout.readline, ''):
+            line = raw_line.strip()
 
-            live.update(get_output())
+            # Detect "Step X/Y : ..." lines to track progress
+            if line.startswith("Step "):
+                match = re.match(r"Step\s+(\d+)/(\d+)\s*:\s*(.*)", line)
+                if match:
+                    current_step = int(match.group(1))
+                    total_steps = int(match.group(2))
+                    description = match.group(3) or "Building"
+
+                    # Initialise progress task once we know total steps
+                    if task_id is None:
+                        task_id = progress_build.add_task("Building Docker image", total=total_steps)
+
+                    # Advance only if new steps discovered (avoid rewinding on multi-stage noise)
+                    if current_step > last_completed:
+                        progress_build.update(task_id, completed=current_step, description=f"{description} ({current_step}/{total_steps})")
+                        last_completed = current_step
+
+                    steps.append(line)
+                else:
+                    # Fallback when regex doesn't match but still starts with Step
+                    progress_build.console.log(line)
+
+            elif verbose:
+                progress_build.console.log(line)
 
         process.stdout.close()
         return_code = process.wait()
         build_success = return_code == 0
+
+        if task_id is not None:
+            progress_build.update(task_id, description="Build complete" if build_success else "Build failed")
 
         if build_success:
             steps.append(f"Built Docker image '{docker_image_name}'.")
@@ -857,35 +881,58 @@ def generate_text(request: TextRequest):
     build_command = f"docker build --no-cache -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}" if force_build else f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
     build_success = False
 
-    log_lines = []
-    max_lines = 5
-    spinner = Spinner("dots", text="Building Docker image")
+    # ------------------------------
+    # Docker build with layer bar 🔨
+    # ------------------------------
+    progress_build = Progress(
+        SpinnerColumn(style="cyan"),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=None),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeElapsedColumn(),
+        console=console,
+    )
 
-    def get_output():
-        return Group(
-            spinner,
-            *[Text(line, style="dim") for line in log_lines[-max_lines:]]
-        )
+    with progress_build:
+        task_id = None
+        last_completed = 0
 
-    with Live(get_output(), refresh_per_second=10) as live:
         process = subprocess.Popen(build_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
 
-        for line in iter(process.stdout.readline, ''):
-            line = line.strip()
-            if line.startswith("Step "):
-                spinner.text = line
-                log_lines.append(line)
-                steps.append(line)
-            elif verbose:
-                log_lines.append(line)
-            elif "-->" in line:
-                log_lines.append(line)
+        for raw_line in iter(process.stdout.readline, ''):
+            line = raw_line.strip()
 
-            live.update(get_output())
+            # Detect "Step X/Y : ..." lines to track progress
+            if line.startswith("Step "):
+                match = re.match(r"Step\s+(\d+)/(\d+)\s*:\s*(.*)", line)
+                if match:
+                    current_step = int(match.group(1))
+                    total_steps = int(match.group(2))
+                    description = match.group(3) or "Building"
+
+                    # Initialise progress task once we know total steps
+                    if task_id is None:
+                        task_id = progress_build.add_task("Building Docker image", total=total_steps)
+
+                    # Advance only if new steps discovered (avoid rewinding on multi-stage noise)
+                    if current_step > last_completed:
+                        progress_build.update(task_id, completed=current_step, description=f"{description} ({current_step}/{total_steps})")
+                        last_completed = current_step
+
+                    steps.append(line)
+                else:
+                    # Fallback when regex doesn't match but still starts with Step
+                    progress_build.console.log(line)
+
+            elif verbose:
+                progress_build.console.log(line)
 
         process.stdout.close()
         return_code = process.wait()
         build_success = return_code == 0
+
+        if task_id is not None:
+            progress_build.update(task_id, description="Build complete" if build_success else "Build failed")
 
         if build_success:
             steps.append(f"Built Docker image '{docker_image_name}'.")
