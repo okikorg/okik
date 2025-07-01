@@ -18,8 +18,6 @@ import uvicorn
 import yaml
 from art import text2art
 from fastapi.routing import APIRoute
-from kubernetes import client, config, utils
-from kubernetes.client import ApiException
 from rich.console import Console, Group
 from rich.live import Live
 from rich.panel import Panel
@@ -41,6 +39,31 @@ typer_app = typer.Typer()
 console = Console()
 
 KUBE_CONFIG_PATH = os.path.expanduser("~/.kube/config")
+
+# Heavy Kubernetes libraries are imported lazily to speed up CLI startup.
+
+client = config = utils = ApiException = None  # type: ignore (populated lazily)
+
+# -----------------------------------------------------------------------------
+# Lazy import helper for Kubernetes modules to reduce startup time
+# -----------------------------------------------------------------------------
+
+def _import_kubernetes():
+    """Dynamically import kubernetes modules when first required."""
+    global client, config, utils, ApiException
+    if client is not None:  # Already imported.
+        return
+
+    try:
+        from kubernetes import client as _client, config as _config, utils as _utils
+        from kubernetes.client import ApiException as _ApiException
+
+        client = _client  # type: ignore
+        config = _config  # type: ignore
+        utils = _utils  # type: ignore
+        ApiException = _ApiException  # type: ignore
+    except ImportError:
+        raise typer.Exit("The 'kubernetes' package is required for this command. Install it with `pip install kubernetes`. ")
 
 @typer_app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
@@ -252,7 +275,9 @@ def build(
             json.dump({"image_name": docker_image_name, "app_name": app_name}, json_file)
         steps.append("Preserved image name in JSON file.")
 
-    build_command = f"docker build --no-cache -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}" if force_build else f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
+    # Enable Docker BuildKit for faster & more efficient builds
+    build_base_cmd = "docker build --no-cache" if force_build else "docker build"
+    build_command = f"DOCKER_BUILDKIT=1 {build_base_cmd} -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
     build_success = False
 
     # ------------------------------
@@ -467,6 +492,7 @@ def routes(
         console.print(f"Failed to load the entry point module '[bold red]{entry_point}[/bold red]': {e}", style="bold red")
 
 def delete_existing_resources(yaml_documents):
+    _import_kubernetes()
     apps_v1 = client.AppsV1Api()
     core_v1 = client.CoreV1Api()
     autoscaling_v1 = client.AutoscalingV1Api()
@@ -500,6 +526,7 @@ def deploy(
     """
     Deploy the application to a Kubernetes cluster.
     """
+    _import_kubernetes()
     services_dir = os.path.join(ProjectDir.SERVICES_DIR.value, 'k8')  # Adjusted for clarity
     yaml_files = [f for f in os.listdir(services_dir) if f.endswith('.yaml') or f.endswith('.yml')]
     if not yaml_files:
@@ -603,6 +630,7 @@ def get_resources(resource: str):
     """
     Get deployments or services in the default namespace.
     """
+    _import_kubernetes()
     try:
         # Load Kubernetes configuration
         config.load_kube_config()
@@ -620,6 +648,7 @@ def get_resources(resource: str):
 
 def get_deployments():
     """Display deployments in a navigable Tree and page the output if it is long."""
+    _import_kubernetes()
     apps_v1 = client.AppsV1Api()
     try:
         deployments = apps_v1.list_namespaced_deployment(namespace="default")
@@ -641,6 +670,7 @@ def get_deployments():
 
 def get_services():
     """Display services in a navigable Tree and page the output if it is long."""
+    _import_kubernetes()
     core_v1 = client.CoreV1Api()
     try:
         services = core_v1.list_namespaced_service(namespace="default")
@@ -663,6 +693,7 @@ def delete_resource(resource: str, name: str):
     """
     Delete a deployment or service in the default namespace.
     """
+    _import_kubernetes()
     try:
         # Load Kubernetes configuration
         config.load_kube_config()
@@ -679,6 +710,7 @@ def delete_resource(resource: str, name: str):
         console.print(f"Unsupported resource type: {resource}", style="bold red")
 
 def delete_deployment(name: str):
+    _import_kubernetes()
     apps_v1 = client.AppsV1Api()
     try:
         apps_v1.delete_namespaced_deployment(name=name, namespace="default")
@@ -687,6 +719,7 @@ def delete_deployment(name: str):
         console.print(f"Failed to delete deployment '{name}': {e}", style="bold red")
 
 def delete_service(name: str):
+    _import_kubernetes()
     core_v1 = client.CoreV1Api()
     try:
         core_v1.delete_namespaced_service(name=name, namespace="default")
@@ -696,6 +729,7 @@ def delete_service(name: str):
 
 
 def list_clusters():
+    _import_kubernetes()
     contexts, current_context = config.list_kube_config_contexts()
 
     table = Table(title="Kubernetes Clusters Configured")
@@ -712,6 +746,7 @@ def list_clusters():
     console.print(table)
 
 def switch_context(context_name: str):
+    _import_kubernetes()
     with open(KUBE_CONFIG_PATH, 'r') as stream:
         kubeconfig = yaml.safe_load(stream)
 
@@ -732,6 +767,7 @@ def cluster(context_name: str = typer.Argument(None, help="Name of the cluster c
     """
     List all Kubernetes clusters configured in the kubeconfig file or switch to a specified cluster.
     """
+    _import_kubernetes()
     try:
         # Load kubeconfig
         config.load_kube_config()
@@ -876,7 +912,9 @@ def generate_text(request: TextRequest):
             json.dump({"image_name": docker_image_name, "app_name": app_name}, json_file)
         steps.append("Preserved image name in JSON file.")
 
-    build_command = f"docker build --no-cache -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}" if force_build else f"docker build -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
+    # Enable Docker BuildKit for faster & more efficient builds
+    build_base_cmd = "docker build --no-cache" if force_build else "docker build"
+    build_command = f"DOCKER_BUILDKIT=1 {build_base_cmd} -t {docker_image_name} -f {os.path.join(docker_file)} {temp_dir}"
     build_success = False
 
     # ------------------------------
