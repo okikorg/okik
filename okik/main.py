@@ -9,6 +9,7 @@ import sys
 import time
 import traceback
 import uuid
+import concurrent.futures
 import re
 import functools
 
@@ -201,7 +202,7 @@ def build(
     )
 
     # We will execute the context-preparation steps inside a single progress task.
-    prepare_steps_total = 5  # Checking entrypoint, copy entrypoint, check Dockerfile, copy Dockerfile, copy requirements
+    prepare_steps_total = 5  # Checking entrypoint, copy files (3), check Dockerfile presence
 
     with progress:
         prepare_task = progress.add_task("Preparing build context...", total=prepare_steps_total)
@@ -213,11 +214,8 @@ def build(
         steps.append("Checked entry point file.")
         progress.update(prepare_task, advance=1)
 
-        # 2️⃣ Ensure temporary directory and copy entry point
+        # 2️⃣ Ensure temporary directory exists
         os.makedirs(temp_dir, exist_ok=True)
-        shutil.copy(entry_point, os.path.join(temp_dir, os.path.basename(entry_point)))
-        steps.append("Copied entry point file to temporary directory.")
-        progress.update(prepare_task, advance=1)
 
         # 3️⃣ Check Dockerfile presence
         if not os.path.isfile(docker_file):
@@ -226,15 +224,32 @@ def build(
         steps.append("Checked Dockerfile.")
         progress.update(prepare_task, advance=1)
 
-        # 4️⃣ Copy Dockerfile
-        shutil.copy(docker_file, os.path.join(temp_dir, os.path.basename(docker_file)))
-        steps.append("Copied Dockerfile to temporary directory.")
-        progress.update(prepare_task, advance=1)
+        # 4️⃣ Copy files concurrently (entry point, Dockerfile, requirements)
+        copy_jobs = [
+            (entry_point, os.path.join(temp_dir, os.path.basename(entry_point))),
+            (docker_file, os.path.join(temp_dir, os.path.basename(docker_file))),
+            ("requirements.txt", os.path.join(temp_dir, "requirements.txt")),
+        ]
 
-        # 5️⃣ Copy requirements.txt
-        shutil.copy("requirements.txt", os.path.join(temp_dir, "requirements.txt"))
-        steps.append("Copied requirements.txt file to temporary directory.")
-        progress.update(prepare_task, advance=1)
+        def _safe_copy(src_dst):  # inner for ThreadPool
+            src, dst = src_dst
+            if not os.path.exists(src):
+                raise FileNotFoundError(src)
+            shutil.copy(src, dst)
+            return os.path.basename(src)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            future_map = {executor.submit(_safe_copy, job): job[0] for job in copy_jobs}
+            for fut in concurrent.futures.as_completed(future_map):
+                src_name = os.path.basename(future_map[fut])
+                try:
+                    fut.result()
+                    steps.append(f"Copied {src_name} concurrently.")
+                except Exception as exc:
+                    log_error(f"Failed to copy {src_name}: {exc}")
+                    raise typer.Exit(code=1)
+                finally:
+                    progress.update(prepare_task, advance=1)
     # Progress context exits here (bar cleared)
 
     os.makedirs(config_dir, exist_ok=True)
