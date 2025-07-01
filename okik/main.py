@@ -619,6 +619,7 @@ def get_resources(resource: str):
         console.print(f"Unsupported resource type: {resource}", style="bold red")
 
 def get_deployments():
+    """Display deployments in a navigable Tree and page the output if it is long."""
     apps_v1 = client.AppsV1Api()
     try:
         deployments = apps_v1.list_namespaced_deployment(namespace="default")
@@ -626,19 +627,20 @@ def get_deployments():
             console.print("No deployments found in the default namespace.", style="bold yellow")
             return
 
-        table = Table(title="Kubernetes Deployments in Default Namespace")
-        table.add_column("Name", justify="left", style="cyan", no_wrap=True)
-        table.add_column("Replicas", justify="right", style="magenta")
-        table.add_column("Available Replicas", justify="right", style="green")
+        root = Tree("[bold cyan]Deployments (default namespace)[/bold cyan]")
+        for d in deployments.items:
+            replicas = d.status.available_replicas or 0
+            desired = d.spec.replicas
+            root.add(f"[cyan]{d.metadata.name}[/cyan] • [green]{replicas}/{desired} ready[/green]")
 
-        for deployment in deployments.items:
-            table.add_row(deployment.metadata.name, str(deployment.spec.replicas), str(deployment.status.available_replicas or 0))
-
-        console.print(table)
+        # Use a pager so the user can scroll when there are many items
+        with console.pager():
+            console.print(root)
     except client.exceptions.ApiException as e:
         console.print(f"Error listing deployments: {e}", style="bold red")
 
 def get_services():
+    """Display services in a navigable Tree and page the output if it is long."""
     core_v1 = client.CoreV1Api()
     try:
         services = core_v1.list_namespaced_service(namespace="default")
@@ -646,17 +648,13 @@ def get_services():
             console.print("No services found in the default namespace.", style="bold yellow")
             return
 
-        table = Table(title="Kubernetes Services in Default Namespace")
-        table.add_column("Name", justify="left", style="cyan", no_wrap=True)
-        table.add_column("Type", justify="left", style="magenta")
-        table.add_column("Cluster IP", justify="left", style="green")
-        table.add_column("Ports", justify="left", style="blue")
+        root = Tree("[bold cyan]Services (default namespace)[/bold cyan]")
+        for s in services.items:
+            ports = ", ".join([f"{p.port}/{p.protocol}" for p in s.spec.ports])
+            root.add(f"[cyan]{s.metadata.name}[/cyan] • [magenta]{s.spec.type}[/magenta] • [green]{s.spec.cluster_ip}[/green] • [blue]{ports}[/blue]")
 
-        for service in services.items:
-            ports = ", ".join([f"{p.port}/{p.protocol}" for p in service.spec.ports])
-            table.add_row(service.metadata.name, service.spec.type, service.spec.cluster_ip, ports)
-
-        console.print(table)
+        with console.pager():
+            console.print(root)
     except client.exceptions.ApiException as e:
         console.print(f"Error listing services: {e}", style="bold red")
 
