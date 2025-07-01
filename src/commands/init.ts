@@ -1,11 +1,8 @@
 import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
-import chalk from 'chalk';
-import ora from 'ora';
+import { color, createSpinner } from '../utils/ui';
 import { v4 as uuidv4 } from 'uuid';
-
-const spinner = ora();
 
 export const initCommand = new Command('init')
   .description('Initialize the project with the required files and directories.')
@@ -68,7 +65,7 @@ export const initCommand = new Command('init')
     });
 
     for (const task of tasks) {
-      spinner.start(task.description);
+      const spinner = createSpinner(task.description);
       try {
         await task.fn();
         spinner.succeed(task.description);
@@ -79,5 +76,5 @@ export const initCommand = new Command('init')
       }
     }
 
-    console.log(chalk.green.bold('\nProject initialized successfully.'));
+    console.log(color.success.bold('\nProject initialized successfully.'));
   });

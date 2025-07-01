@@ -9,6 +9,7 @@ import { deployCommand } from './commands/deploy';
 import { getCommand } from './commands/get';
 import { deleteCommand } from './commands/delete';
 import { clusterCommand } from './commands/cluster';
+import { handleError } from './utils/error';
 // Import other commands as they are implemented
 
 const program = new Command();
@@ -31,4 +32,4 @@ program.addCommand(getCommand);
 program.addCommand(deleteCommand);
 program.addCommand(clusterCommand);
 
-program.parse(process.argv);
+program.parseAsync(process.argv).catch(handleError);

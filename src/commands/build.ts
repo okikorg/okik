@@ -1,16 +1,14 @@
 import { Command } from 'commander';
 import fs from 'fs-extra';
 import path from 'path';
-import chalk from 'chalk';
-import ora from 'ora';
 import { v4 as uuidv4 } from 'uuid';
 import Docker from 'dockerode';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { color, createSpinner } from '../utils/ui';
 
 const docker = new Docker();
 const execAsync = promisify(exec);
-const spinner = ora();
 
 interface BuildOptions {
   entryPoint: string;
@@ -42,7 +40,7 @@ export const buildCommand = new Command('build')
 
     // Validate entry point
     if (!(await fs.pathExists(opts.entryPoint))) {
-      console.error(chalk.red(`Entry point file '${opts.entryPoint}' not found.`));
+      console.error(color.error(`Entry point file '${opts.entryPoint}' not found.`));
       process.exitCode = 1;
       return;
     }
@@ -53,7 +51,7 @@ export const buildCommand = new Command('build')
     steps.push('Copied entry point file.');
 
     if (!(await fs.pathExists(opts.dockerFile))) {
-      console.error(chalk.red(`Dockerfile '${opts.dockerFile}' not found.`));
+      console.error(color.error(`Dockerfile '${opts.dockerFile}' not found.`));
       process.exitCode = 1;
       return;
     }
@@ -97,18 +95,18 @@ export const buildCommand = new Command('build')
       ? `docker build --no-cache -t ${dockerImageName} -f ${path.join(tempDir, path.basename(opts.dockerFile))} ${tempDir}`
       : `docker build -t ${dockerImageName} -f ${path.join(tempDir, path.basename(opts.dockerFile))} ${tempDir}`;
 
-    spinner.start('Building Docker image');
+    const spinner = createSpinner('Building Docker image');
     try {
       const { stdout, stderr } = await execAsync(buildCmd);
       if (opts.verbose) {
         console.log(stdout);
         console.error(stderr);
       }
-      spinner.succeed('Docker image built');
+      spinner.succeed(color.success('Docker image built'));
       steps.push(`Built Docker image '${dockerImageName}'.`);
     } catch (err: any) {
-      spinner.fail('Docker build failed');
-      console.error(chalk.red(err.stderr || err.message));
+      spinner.fail(color.error('Docker build failed'));
+      console.error(color.error(err.stderr || err.message));
       process.exitCode = 1;
       return;
     }
@@ -118,14 +116,14 @@ export const buildCommand = new Command('build')
     steps.push('Cleaned up temporary directory.');
 
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);
-    console.log(chalk.green(`Docker image '${dockerImageName}' built successfully in ${elapsed}s.`));
+    console.log(color.success(`Docker image '${dockerImageName}' built successfully in ${elapsed}s.`));
 
     if (!opts.verbose) {
-      console.log(chalk.dim("Run with --verbose to see full build output."));
+      console.log(color.dim("Run with --verbose to see full build output."));
     }
 
     // Print steps
     for (const step of steps) {
-      console.log(chalk.blue('- ' + step));
+      console.log(color.accent('- ' + step));
     }
   });
